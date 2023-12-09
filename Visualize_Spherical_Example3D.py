@@ -26,7 +26,7 @@ if fieldline_flf.geometry==0:
 	Q[np.isinf(Q)]=1E6
 	Q[np.isinf(-Q)]=-1E6
 	slogQ=np.sign(Q)*np.log(np.clip(abs(Q),2,1E6))/np.log(10.0)
-	dim3=Q_flf.z_in[0]*np.ones(np.shape(dim1))
+	dim3=Q_flf.coord3[0]*np.ones(np.shape(dim1))
 
 	for idx in range(len(fieldline_flf.fieldlines)):
 		mlab.plot3d(fieldline_flf.fieldlines[idx][:,0],fieldline_flf.fieldlines[idx][:,1],fieldline_flf.fieldlines[idx][:,2],line_width=0.01,color=(0/255,0/255,0/255),tube_radius=0.002)
@@ -41,7 +41,7 @@ if fieldline_flf.geometry==1:
 	Q[np.isinf(Q)]=1E6
 	Q[np.isinf(-Q)]=-1E6
 	slogQ=np.sign(Q)*np.log(np.clip(abs(Q),2,1E6))/np.log(10.0)
-	dim3=Q_flf.x_in[0]*np.ones(np.shape(dim1))
+	dim3=Q_flf.coord1[0]*np.ones(np.shape(dim1))
 
 	plane_X=dim3*np.sin(dim1)*np.cos(dim2)
 	plane_Y=dim3*np.sin(dim1)*np.sin(dim2)

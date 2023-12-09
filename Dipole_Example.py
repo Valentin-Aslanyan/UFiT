@@ -51,8 +51,8 @@ UFiT_flf=read_UFiT_output(UFiTfile_name='ufit_dipole.flf')
 UFiT_flf_norm=read_UFiT_output(UFiTfile_name='ufit_dipole_norm.flf')
 
 plt.figure("Q")
-plt.plot(UFiT_flf.y_in,np.log(abs(UFiT_flf.Q_out))/np.log(10.0),color="black",label="$B$")
-plt.plot(UFiT_flf_norm.y_in,np.log(abs(UFiT_flf_norm.Q_out))/np.log(10.0),color="red",label="$\\hat{B}$")
+plt.plot(UFiT_flf.coord2,np.log(abs(UFiT_flf.Q_out))/np.log(10.0),color="black",label="$B$")
+plt.plot(UFiT_flf_norm.coord2,np.log(abs(UFiT_flf_norm.Q_out))/np.log(10.0),color="red",label="$\\hat{B}$")
 
 plt.ylabel(r"$\log_{10}(Q)$",fontsize=20)
 plt.xlabel(r"$\theta$ [$^{c}$]",fontsize=20)
