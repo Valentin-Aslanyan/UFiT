@@ -83,6 +83,7 @@ UFiT_run.input_type=1
 UFiT_run.num_proc=4
 UFiT_run.periodic_PHI=True
 UFiT_run.normalized_B=True
+UFiT_run.include_curvature=False
 UFiT_run.grid_regular=True
 UFiT_run.load_B=False
 UFiT_run.save_fieldlines=False

@@ -4,11 +4,11 @@
 subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_regular, &
                                 IN_periodic_X,IN_periodic_Y,IN_periodic_Z,IN_periodic_PHI, &
                                 IN_print_devices,IN_save_endpoints,IN_save_Q,IN_save_fieldlines, &
-                                IN_check_starts,IN_normalized_B,IN_num_proc,IN_MAX_STEPS, &
-                                IN_step_size,IN_B_filename,IN_out_filename,IN_load_B, &
-                                IN_numin_tot,IN_numin1,IN_numin2,IN_numin3,IN_coord1,IN_coord2, &
-                                IN_coord3,IN_sz1,IN_sz2,IN_sz3,IN_num_blocks,IN_grid1,IN_grid2, &
-                                IN_grid3,IN_B_grid,IN_grid1_ir,IN_grid2_ir,IN_grid3_ir, &
+                                IN_check_starts,IN_normalized_B,IN_include_curvature,IN_num_proc, &
+                                IN_MAX_STEPS,IN_step_size,IN_B_filename,IN_out_filename, &
+                                IN_load_B,IN_numin_tot,IN_numin1,IN_numin2,IN_numin3,IN_coord1, &
+                                IN_coord2,IN_coord3,IN_sz1,IN_sz2,IN_sz3,IN_num_blocks,IN_grid1, &
+                                IN_grid2,IN_grid3,IN_B_grid,IN_grid1_ir,IN_grid2_ir,IN_grid3_ir, &
                                 IN_B_grid_ir,IN_write_output,IN_return_output, &
                                 OUT_fieldline_endpoints,OUT_fieldline_allpos,OUT_fieldline_pts, &
                                 OUT_fieldline_ptn,OUT_fieldline_Q &
@@ -32,6 +32,7 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
       integer(c_int), intent(in), value :: IN_save_fieldlines
       integer(c_int), intent(in), value :: IN_check_starts
       integer(c_int), intent(in), value :: IN_normalized_B
+      integer(c_int), intent(in), value :: IN_include_curvature
       integer(c_int), intent(in), value :: IN_num_proc
       integer(c_int), intent(in), value :: IN_MAX_STEPS
       REAL(c_double), intent(in), value :: IN_step_size
@@ -80,6 +81,7 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
       save_fieldlines = cint_to_logical(IN_save_fieldlines)
       check_starts = cint_to_logical(IN_check_starts)
       normalized_B = cint_to_logical(IN_normalized_B)
+      include_curvature = cint_to_logical(IN_include_curvature)
       num_proc = IN_num_proc
       MAX_STEPS = IN_MAX_STEPS
       step_size = IN_step_size

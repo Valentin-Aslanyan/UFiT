@@ -52,6 +52,7 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.save_fieldlines=False
 		self.check_starts=False
 		self.normalized_B=True
+		self.include_curvature=False
 		self.num_proc=1
 		self.MAX_STEPS=5000
 		self.step_size=0.005
@@ -99,6 +100,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 
 	fortranlib = ctypes.CDLL(shared_lib_path)
 	fortranlib.argtypes = [	ctypes.c_int, 
+				ctypes.c_int, 
 				ctypes.c_int, 
 				ctypes.c_int, 
 				ctypes.c_int, 
@@ -191,6 +193,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 					ctypes.c_int(bool_to_int(UFiT_input.save_fieldlines)), 
 					ctypes.c_int(bool_to_int(UFiT_input.check_starts)), 
 					ctypes.c_int(bool_to_int(UFiT_input.normalized_B)), 
+					ctypes.c_int(bool_to_int(UFiT_input.include_curvature)), 
 					ctypes.c_int(UFiT_input.num_proc), 
 					ctypes.c_int(UFiT_input.MAX_STEPS), 
 					ctypes.c_double(UFiT_input.step_size), 
