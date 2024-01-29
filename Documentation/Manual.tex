@@ -138,6 +138,7 @@ You will need to add some command-line arguments from the tables below:
 		\texttt{-sf} & \textbf{s}ave \textbf{f}ieldlines \\\hline
 		\texttt{-sq} & \textbf{s}ave squashing factor $\mathbf{Q}$  \\\hline
 		\texttt{-nb} & normalized $B$ for $Q$ calculation; \textbf{this is highly recommended} \\\hline
+		\texttt{-ic} & incude curvature terms for $Q$ calculation (for spherical geometry) \\\hline
 		\texttt{-dl} & step size \\\hline
 		\texttt{-ms} & \textbf{m}ax \textbf{s}teps  \\\hline
 		\texttt{-i} & full path to \textbf{i}nput file (defining fieldline starts), \textit{e.g.} \texttt{./dir/ufit.inp} \\\hline
@@ -159,6 +160,35 @@ would calculate $Q$ in the spherical geometry (periodic longitude $\phi$), readi
 
 \vspace{2mm}
 {\Large \textbf{(Optional) Running from a command file}}
+
+When running from command line, the option \texttt{-c} can be used to specify a command file, from which the arguments can be read instead of through the command line. If no command line options are supplied, \texttt{UFiT} will automatically look for the default command file \texttt{ufit.dat} in the current working directory. The command file overwrites any command line arguments, if there is a conflict.
+
+Each line in the command file specifies one argument, beginning with one of the following command codes, a semicolon and a space.
+
+\begin{tabular}{|c|l|}		
+		\hline
+		\textbf{Code} & \textbf{Effect} \\\hline\hline
+		\texttt{G:} & \textbf{g}eometry: $0 =$ Cartesian; $1 =$ Spherical; $2 =$ Cylindrical  \\\hline
+		\texttt{R:} & print available \textbf{r}esources (CPUs for now) \\\hline
+		\texttt{NP:} &  \textbf{n}umber of \textbf{p}rocessors (CPU) \\\hline
+		\texttt{CS:} & \textbf{c}heck \textbf{s}tart points \\\hline
+		\texttt{PX:} & \textbf{p}eriodic \textbf{X} \\\hline
+		\texttt{PY:} & \textbf{p}eriodic \textbf{Y}  \\\hline
+		\texttt{PZ:} & \textbf{p}eriodic \textbf{Z}  \\\hline
+		\texttt{PP:} & \textbf{p}eriodic $\phi$  \\\hline
+		\texttt{SE:} & \textbf{s}ave fieldline \textbf{e}ndpoints \\\hline
+		\texttt{SF:} & \textbf{s}ave \textbf{f}ieldlines \\\hline
+		\texttt{SQ:} & \textbf{s}ave squashing factor $\mathbf{Q}$  \\\hline
+		\texttt{NB:} & normalized $B$ for $Q$ calculation; \textbf{this is highly recommended} \\\hline
+		\texttt{IC:} & incude curvature terms for $Q$ calculation (for spherical geometry) \\\hline
+		\texttt{DL:} & step size \\\hline
+		\texttt{MS:} & \textbf{m}ax \textbf{s}teps  \\\hline
+		\texttt{I:} & full path to \textbf{i}nput file (defining fieldline starts), \textit{e.g.} \texttt{./dir/ufit.inp} \\\hline
+		\texttt{BT:} & $\mathbf{B}$ file \textbf{t}ype (see below) \\\hline
+		\texttt{B:} & full path to $\mathbf{B}$ file \textit{e.g.} \texttt{./dir/ufit.bin} \\\hline
+		\texttt{O:} & full path to \textbf{o}utput file, \textit{e.g.} \texttt{./dir/out.flf} \\\hline
+
+\end{tabular}
 
 
 \vspace{2mm}
@@ -290,7 +320,7 @@ which must be changed to instead contain a path to where the file \texttt{UFiT\_
 \vspace{2mm}
 {\large \textbf{(Optional) Calling routines directly from \texttt{Python}}}
 
-(Coming soon)
+You may create a \texttt{Python} script which calls compiled routines in \texttt{UFiT\_Python\_Callable.so} directly, without the go-between of calling from command line and writing in/outputs to disk. Example 2 above features just such a script.
 
 
 \end{document}
