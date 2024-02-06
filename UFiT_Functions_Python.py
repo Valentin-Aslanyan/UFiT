@@ -19,6 +19,7 @@ class UFiT_flf_output:	#fieldline file, reading result of UFiT
 		self.save_endpoints = False
 		self.save_Q = False
 		self.save_fieldlines = False
+		self.save_connection = False
 		self.periodic_X = False
 		self.periodic_Y = False
 		self.periodic_Z = False
@@ -30,9 +31,62 @@ class UFiT_flf_output:	#fieldline file, reading result of UFiT
 		self.coord1 = np.zeros((2))
 		self.coord2 = np.zeros((1))
 		self.coord3 = np.zeros((1))
-		self.endpoints = np.zeros((6,2))
+		self.endpoints = np.zeros((2,6))
 		self.Q_out = np.zeros((2))
 		self.fieldlines = []
+		self.connection = np.zeros((2))
+
+	def get_Q_2D(self,slice_dim=None,slice_index=None):
+		if self.save_Q==False:
+			print("Q not saved, use -sq command line option")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1,1))
+		elif self.input_type==0:
+			print("Input type 0 (each fieldline start point is uniquely identified) is unsuitable for 2D grid; use -it 2")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1,1))
+		elif slice_dim==None:
+			if self.numin1==1:
+				return self.coord2, self.coord3, self.Q_out.reshape(self.numin3,self.numin2)
+			elif self.numin2==1:
+				return self.coord1, self.coord3, self.Q_out.reshape(self.numin3,self.numin1)
+			elif self.numin3==1:
+				return self.coord1, self.coord2, self.Q_out.reshape(self.numin2,self.numin1)
+			else:
+				print("Input grid (fieldline starts) is 3D, must specify slice_dim and slice_index")
+				return np.zeros((1)),np.zeros((1)),np.zeros((1,1))
+		elif slice_index==None:
+			print("Specify slice index")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1,1))
+		elif slice_dim==0 or slice_dim.lower()=='x' or slice_dim.lower()=='r':
+			return self.coord2, self.coord3, self.Q_out.reshape(self.numin3,self.numin2,self.numin1)[:,:,slice_index]
+		elif slice_dim==1 or slice_dim.lower()=='y' or slice_dim.lower()[0]=='t':
+			return self.coord1, self.coord3, self.Q_out.reshape(self.numin3,self.numin2,self.numin1)[:,slice_index,:]
+		elif slice_dim==2 or slice_dim.lower()=='z' or slice_dim.lower()[0]=='p':
+			return self.coord1, self.coord2, self.Q_out.reshape(self.numin3,self.numin2,self.numin1)[slice_index,:,:]
+		else:
+			print("slice_dim or slice_index incorrect")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1,1))
+
+
+	def get_Q_3D(self):
+		if self.save_Q==False:
+			print("Q not saved, use -sq command line option")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
+		elif self.input_type==0:
+			print("Input type 0 (each fieldline start point is uniquely identified) is unsuitable for 2D grid; use -it 2")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
+		else:
+			return self.coord1, self.coord2, self.coord3, self.Q_out.reshape(self.numin3,self.numin2,self.numin1)
+
+
+	def get_connection_3D(self):
+		if self.save_connection==False:
+			print("connection not saved, use -sc command line option")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
+		elif self.input_type==0:
+			print("Input type 0 (each fieldline start point is uniquely identified) is unsuitable for 2D grid; use -it 2")
+			return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
+		else:
+			return self.coord1, self.coord2, self.coord3, self.connection.reshape(self.numin3,self.numin2,self.numin1)
 
 
 class UFiT_call_input:	#input to call UFiT from Python
@@ -50,6 +104,8 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.save_endpoints=True
 		self.save_Q=False
 		self.save_fieldlines=False
+		self.save_connection=False
+		self.user_defined=False
 		self.check_starts=False
 		self.normalized_B=True
 		self.include_curvature=False
@@ -85,6 +141,8 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.fieldline_pts = np.zeros((1),dtype="int32")
 		self.fieldline_ptn = np.zeros((1),dtype="int32")
 		self.Q_out = np.zeros((2),dtype="double")
+		self.fieldline_connection = np.zeros((2),dtype="b")
+		self.fieldline_user = np.zeros((1,2),dtype="double")
 
 
 def call_UFiT(shared_lib_path,UFiT_input):
@@ -100,6 +158,8 @@ def call_UFiT(shared_lib_path,UFiT_input):
 
 	fortranlib = ctypes.CDLL(shared_lib_path)
 	fortranlib.argtypes = [	ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.c_int, 
 				ctypes.c_int, 
 				ctypes.c_int, 
 				ctypes.c_int, 
@@ -145,6 +205,8 @@ def call_UFiT(shared_lib_path,UFiT_input):
 				ctypes.POINTER(ctypes.c_double), 
 				ctypes.POINTER(ctypes.c_int), 
 				ctypes.POINTER(ctypes.c_int), 
+				ctypes.POINTER(ctypes.c_double),
+				ctypes.POINTER(ctypes.c_byte),
 				ctypes.POINTER(ctypes.c_double)
 				]
 
@@ -158,9 +220,17 @@ def call_UFiT(shared_lib_path,UFiT_input):
 		UFiT_input.sz2=np.shape(UFiT_input.B_grid_ir)[2]
 		UFiT_input.sz3=np.shape(UFiT_input.B_grid_ir)[3]
 
-	UFiT_input.coord1=np.array(UFiT_input.coord1)
-	UFiT_input.coord2=np.array(UFiT_input.coord2)
-	UFiT_input.coord3=np.array(UFiT_input.coord3)
+	UFiT_input.coord1=np.array(UFiT_input.coord1,dtype="double")
+	UFiT_input.coord2=np.array(UFiT_input.coord2,dtype="double")
+	UFiT_input.coord3=np.array(UFiT_input.coord3,dtype="double")
+	UFiT_input.grid1=np.array(UFiT_input.grid1,dtype="double")
+	UFiT_input.grid2=np.array(UFiT_input.grid2,dtype="double")
+	UFiT_input.grid3=np.array(UFiT_input.grid3,dtype="double")
+	UFiT_input.B_grid=np.array(UFiT_input.B_grid,dtype="double")
+	UFiT_input.grid1_ir=np.array(UFiT_input.grid1_ir,dtype="double")
+	UFiT_input.grid2_ir=np.array(UFiT_input.grid2_ir,dtype="double")
+	UFiT_input.grid3_ir=np.array(UFiT_input.grid3_ir,dtype="double")
+	UFiT_input.B_grid_ir=np.array(UFiT_input.B_grid_ir,dtype="double")
 	if UFiT_input.input_type==0:
 		UFiT_input.numin_tot=min(len(UFiT_input.coord1),len(UFiT_input.coord2),len(UFiT_input.coord3))
 		UFiT_input.numin1=UFiT_input.numin_tot
@@ -178,6 +248,11 @@ def call_UFiT(shared_lib_path,UFiT_input):
 		UFiT_input.fieldline_ptn = np.zeros((UFiT_input.numin_tot),dtype="int32")
 	if UFiT_input.save_Q:
 		UFiT_input.Q_out = np.zeros((UFiT_input.numin_tot),dtype="double")
+	if UFiT_input.save_connection:
+		UFiT_input.fieldline_connection = np.zeros((UFiT_input.numin_tot),dtype="b")
+	if UFiT_input.save_connection:
+		UFiT_input.fieldline_user = np.zeros((1,UFiT_input.numin_tot),dtype="double")
+
 
 	fortranlib.UFiT_Python_Callable(ctypes.c_int(UFiT_input.geometry), 
 					ctypes.c_int(UFiT_input.Bfile_type), 
@@ -191,6 +266,8 @@ def call_UFiT(shared_lib_path,UFiT_input):
 					ctypes.c_int(bool_to_int(UFiT_input.save_endpoints)), 
 					ctypes.c_int(bool_to_int(UFiT_input.save_Q)), 
 					ctypes.c_int(bool_to_int(UFiT_input.save_fieldlines)), 
+					ctypes.c_int(bool_to_int(UFiT_input.save_connection)), 
+					ctypes.c_int(bool_to_int(UFiT_input.user_defined)), 
 					ctypes.c_int(bool_to_int(UFiT_input.check_starts)), 
 					ctypes.c_int(bool_to_int(UFiT_input.normalized_B)), 
 					ctypes.c_int(bool_to_int(UFiT_input.include_curvature)), 
@@ -225,7 +302,9 @@ def call_UFiT(shared_lib_path,UFiT_input):
 					UFiT_input.fieldline_allpos.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					UFiT_input.fieldline_pts.ctypes.data_as(ctypes.POINTER(ctypes.c_int)), 
 					UFiT_input.fieldline_ptn.ctypes.data_as(ctypes.POINTER(ctypes.c_int)), 
-					UFiT_input.Q_out.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+					UFiT_input.Q_out.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+					UFiT_input.fieldline_connection.ctypes.data_as(ctypes.POINTER(ctypes.c_byte)),
+					UFiT_input.fieldline_user.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
 					)
 
 	return UFiT_input
@@ -310,6 +389,9 @@ def read_UFiT_output(UFiTfile_name='ufit.flf',print_header=False):
 				f_o.geometry=int(command_value)
 			elif command_code.lower() == 'it:':
 				f_o.input_type=int(command_value)
+			elif command_code.lower() == 'ic:':
+				if command_value[0].lower()=='t':
+					f_o.include_curvature=True
 			elif command_code.lower() == 'se:':
 				if command_value[0].lower()=='t':
 					f_o.save_endpoints=True
@@ -319,6 +401,9 @@ def read_UFiT_output(UFiTfile_name='ufit.flf',print_header=False):
 			elif command_code.lower() == 'sf:':
 				if command_value[0].lower()=='t':
 					f_o.save_fieldlines=True
+			elif command_code.lower() == 'sc:':
+				if command_value[0].lower()=='t':
+					f_o.save_connection=True
 			elif command_code.lower() == 'px:':
 				if command_value[0].lower()=='t':
 					f_o.periodic_X=True
@@ -359,6 +444,8 @@ def read_UFiT_output(UFiTfile_name='ufit.flf',print_header=False):
 		num_fl=np.array(struct.unpack('i'*f_o.numin_tot,ufit_file.read(4*f_o.numin_tot)),dtype=np.int32)
 		for idx in range(f_o.numin_tot):
 			f_o.fieldlines.append(np.array(struct.unpack(f_o.fltname*3*num_fl[idx],ufit_file.read(f_o.fltsz*3*num_fl[idx]))).reshape(num_fl[idx],3))
+	if f_o.save_connection:
+		f_o.connection=np.array(struct.unpack('b'*f_o.numin_tot,ufit_file.read(f_o.numin_tot)))
 	ufit_file.close()
 	return f_o
 
@@ -399,11 +486,32 @@ def get_Q_3D(flf_output):
 		print("Q not saved, use -sq command line option")
 		return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
 	elif flf_output.input_type==0:
-		print("Input type 0 (each fieldline start point is uniquely identified) is unsuitable for 2D grid; use -it 2")
+		print("Input type 0 (each fieldline start point is uniquely identified) is unsuitable for 3D grid; use -it 2")
 		return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
-		return flf_output.coord1, flf_output.coord2, flf_output.Q_out.reshape(flf_output.numin3,flf_output.numin2,flf_output.numin1)[slice_index,:,:]
 	else:
 		return flf_output.coord1, flf_output.coord2, flf_output.coord3, flf_output.Q_out.reshape(flf_output.numin3,flf_output.numin2,flf_output.numin1)
+
+
+def get_connection_3D(flf_output):
+	if flf_output.save_connection==False:
+		print("connection not saved, use -sc command line option")
+		return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
+	elif flf_output.input_type==0:
+		print("Input type 0 (each fieldline start point is uniquely identified) is unsuitable for 3D grid; use -it 2")
+		return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1))
+	else:
+		return flf_output.coord1, flf_output.coord2, flf_output.coord3, flf_output.connection.reshape(flf_output.numin3,flf_output.numin2,flf_output.numin1)
+
+
+def get_endpoints_3D(flf_output):
+	if flf_output.save_endpoints==False:
+		print("endpoints not saved, use -se command line option")
+		return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1,6))
+	elif flf_output.input_type==0:
+		print("Input type 0 (each fieldline start point is uniquely identified) is unsuitable for 3D grid; use -it 2")
+		return np.zeros((1)),np.zeros((1)),np.zeros((1)),np.zeros((1,1,1,6))
+	else:
+		return flf_output.coord1, flf_output.coord2, flf_output.coord3, flf_output.endpoints.reshape(flf_output.numin3,flf_output.numin2,flf_output.numin1,6)
 
 
 

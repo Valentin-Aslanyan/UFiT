@@ -87,7 +87,7 @@ $\quad\quad$\texttt{UFiT\_home\_directory=\textquotesingle /change/this/path\tex
 
 This should be set to a path to where \texttt{UFiT} is installed. Now run the script by executing: 
 
-$\quad\quad$\texttt{python Visualize\_Spherical\_Example.py}
+$\quad\quad$\texttt{python HMI\_Example.py}
 
 A synoptic magnetogram will be downloaded and a Potential Field Source Surface (PFSS) model be used to calculate $B$. This time, \texttt{Python} will call a compiled library directly, without the go-between of the input files and so on. You should see the following figure:
 
@@ -137,6 +137,8 @@ You will need to add some command-line arguments from the tables below:
 		\texttt{-se} & \textbf{s}ave fieldline \textbf{e}ndpoints \\\hline
 		\texttt{-sf} & \textbf{s}ave \textbf{f}ieldlines \\\hline
 		\texttt{-sq} & \textbf{s}ave squashing factor $\mathbf{Q}$  \\\hline
+		\texttt{-sc} & \textbf{s}ave \textbf{c}onnectivity type  \\\hline
+		\texttt{-ud} & \textbf{u}ser \textbf{d}efined calculation  \\\hline
 		\texttt{-nb} & normalized $B$ for $Q$ calculation; \textbf{this is highly recommended} \\\hline
 		\texttt{-ic} & incude curvature terms for $Q$ calculation (for spherical geometry) \\\hline
 		\texttt{-dl} & step size \\\hline
@@ -179,6 +181,8 @@ Each line in the command file specifies one argument, beginning with one of the 
 		\texttt{SE:} & \textbf{s}ave fieldline \textbf{e}ndpoints \\\hline
 		\texttt{SF:} & \textbf{s}ave \textbf{f}ieldlines \\\hline
 		\texttt{SQ:} & \textbf{s}ave squashing factor $\mathbf{Q}$  \\\hline
+		\texttt{SC:} & \textbf{s}ave \textbf{c}onnectivity type  \\\hline
+		\texttt{UD:} & \textbf{u}ser \textbf{d}efined calculation  \\\hline
 		\texttt{NB:} & normalized $B$ for $Q$ calculation; \textbf{this is highly recommended} \\\hline
 		\texttt{IC:} & incude curvature terms for $Q$ calculation (for spherical geometry) \\\hline
 		\texttt{DL:} & step size \\\hline
@@ -321,6 +325,13 @@ which must be changed to instead contain a path to where the file \texttt{UFiT\_
 {\large \textbf{(Optional) Calling routines directly from \texttt{Python}}}
 
 You may create a \texttt{Python} script which calls compiled routines in \texttt{UFiT\_Python\_Callable.so} directly, without the go-between of calling from command line and writing in/outputs to disk. Example 2 above features just such a script.
+
+
+\vspace{2mm}
+{\Large \textbf{User defined calculations}}
+
+You are, of course, free to change the source code as you see fit. The easiest way to run your own bespoke calculation might be to use the \texttt{user\_defined} option.
+
 
 
 \end{document}

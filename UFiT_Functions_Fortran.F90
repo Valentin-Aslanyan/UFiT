@@ -7,6 +7,8 @@
 !For irregular (unstructured) grids, there is an addition num_blocks dimension
 
 module UFiT_Functions_Fortran
+      USE UFiT_Definitions_Fortran
+      USE UFiT_User_Functions
       USE OMP_LIB
 #ifdef USE_NC
       USE netcdf
@@ -16,51 +18,8 @@ module UFiT_Functions_Fortran
 
       !public :: 
 
-      INTEGER, PARAMETER :: num = KIND(0.d0) ! precision for floats
-      INTEGER, PARAMETER :: HEADER_LENGTH = 1024
-      REAL(num), PARAMETER :: PI = 4.0_num*ATAN(1.0_num)
-      REAL(num), PARAMETER :: EPS = 1.0E-15_num  !Small value
-      INTEGER, PARAMETER :: str_mx = 300     ! max length of character strings
-      INTEGER :: geometry, Bfile_type, input_type, numin_tot, numin1, numin2, numin3
-      LOGICAL :: save_endpoints, save_Q, save_fieldlines, check_starts, normalized_B
-      LOGICAL :: include_curvature, periodic_X, periodic_Y, periodic_Z, periodic_PHI
-      INTEGER :: num_proc
-      INTEGER :: MAX_STEPS
-      REAL(num) :: step_size
-      LOGICAL :: read_command_file, print_devices
-      INTEGER :: sz_1, sz_2, sz_3, num_blocks
-      CHARACTER(len=str_mx) :: cmd_filename
-      CHARACTER(len=str_mx) :: B_filename
-      CHARACTER(len=str_mx) :: in_filename
-      CHARACTER(len=str_mx) :: out_filename
-      LOGICAL :: grid_regular
-      !Following are seeds of fieldlines
-      REAL(num), DIMENSION(:), ALLOCATABLE :: coord1_in  !X for Cartesian, r for spherical
-      REAL(num), DIMENSION(:), ALLOCATABLE :: coord2_in  !Y for Cartesian, theta for spherical
-      REAL(num), DIMENSION(:), ALLOCATABLE :: coord3_in  !Z for Cartesian, phi for spherical
-      REAL(num) :: grid1min, grid1max, grid2min, grid2max, grid3min, grid3max
-      !Regular coordinate grid
-      REAL(num), DIMENSION(:), ALLOCATABLE :: grid1      !X for Cartesian, r for spherical
-      REAL(num), DIMENSION(:), ALLOCATABLE :: grid2      !Y for Cartesian, theta for spherical
-      REAL(num), DIMENSION(:), ALLOCATABLE :: grid3      !Z for Cartesian, phi for spherical
-      REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: B_grid
-      !Irregular coordinate grid (e.g. ARMS blocks)
-      REAL(num), DIMENSION(:,:), ALLOCATABLE :: grid1_ir      !X for Cartesian, r for spherical
-      REAL(num), DIMENSION(:,:), ALLOCATABLE :: grid2_ir      !Y for Cartesian, theta for spherical
-      REAL(num), DIMENSION(:,:), ALLOCATABLE :: grid3_ir      !Z for Cartesian, phi for spherical
-      REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: B_grid_ir
-      REAL(num) :: coord_width(3)                        !Distance between last and first points in respective coordinate
-      REAL(num), DIMENSION(:,:), ALLOCATABLE :: fieldline_endpoints
-      REAL(num), DIMENSION(:), ALLOCATABLE :: fieldline_Q
-      REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: fieldline_allpos
-      INTEGER, DIMENSION(:), ALLOCATABLE :: fieldline_pts
-      INTEGER, DIMENSION(:), ALLOCATABLE :: fieldline_ptn
-      !Fieldlines are considered closed if both endpoints are within this constant *min(Z) or *min(R) respectively
-      REAL(num) :: closed_fl_constant=1.1_num
-
 
       contains
-
 
 
       subroutine initialize_variables
@@ -83,6 +42,8 @@ module UFiT_Functions_Fortran
         save_endpoints = .false.    !Positions of endpoints of fieldline (at boundary)
         save_Q = .false.            !Squashing factor
         save_fieldlines = .false.   !Full points along fieldline
+        save_connection = .false.   !How the fieldline is connected; 0 = closed, 1 = open, 2 = disconnected
+        user_defined = .false.      !TODO
         check_starts = .false.      !Loop over start points and check that they are inside the B_grid
         normalized_B = .false.      !Use B_hat for the calculation of Q
         include_curvature = .false. !Use full curvature formula for spherical coordinates
@@ -143,6 +104,12 @@ module UFiT_Functions_Fortran
 
               case ('-sf', '--save_fieldlines')
                 save_fieldlines = .true.
+
+              case ('-sc', '--save_connection')
+                save_connection = .true.
+
+              case ('-ud', '--user_defined')
+                user_defined = .true.
 
               case ('-cs', '--check_starts')
                 check_starts = .true.
@@ -270,6 +237,12 @@ module UFiT_Functions_Fortran
                     print *, 'unrecognised periodic PHI option: ', TRIM(arg2)
                   end if
 
+                case ('R:')
+                  read(arg2,*,iostat=stat2) print_devices
+                  if (stat2 .ne. 0) then
+                    print *, 'unrecognised resource option: ', TRIM(arg2)
+                  end if
+
                 case ('SE:')
                   read(arg2,*,iostat=stat2) save_endpoints
                   if (stat2 .ne. 0) then
@@ -286,6 +259,18 @@ module UFiT_Functions_Fortran
                   read(arg2,*,iostat=stat2) save_fieldlines
                   if (stat2 .ne. 0) then
                     print *, 'unrecognised save fieldlines option: ', TRIM(arg2)
+                  end if
+
+                case ('SC:')
+                  read(arg2,*,iostat=stat2) save_connection
+                  if (stat2 .ne. 0) then
+                    print *, 'unrecognised save connection option: ', TRIM(arg2)
+                  end if
+
+                case ('UD:')
+                  read(arg2,*,iostat=stat2) user_defined
+                  if (stat2 .ne. 0) then
+                    print *, 'unrecognised user defined option: ', TRIM(arg2)
                   end if
 
                 case ('CS:')
@@ -539,10 +524,11 @@ module UFiT_Functions_Fortran
 
       subroutine load_Bfield
 
-        LOGICAL :: bfile_exists, stop_found = .false.
+        LOGICAL :: bfile_exists, stop_found
         INTEGER :: Bfile_type_actual, B_unit, stp_idx
 
       !Automatically detect file type based on extension
+        stop_found = .false.
         if (Bfile_type .eq. -1) then
           stp_idx = str_mx
           DO WHILE ((stp_idx .gt. 0) .and. (.not. stop_found))
@@ -763,22 +749,33 @@ module UFiT_Functions_Fortran
             print *, 'Dimension 1 (X), min: ',grid1min, ' max: ',grid1max
             print *, 'Dimension 2 (Y), min: ',grid2min, ' max: ',grid2max
             print *, 'Dimension 3 (Z), min: ',grid3min, ' max: ',grid3max
+            if ((coord_in1min .lt. grid1min) .or. (coord_in1max .gt. grid1max) .or. &
+                (coord_in2min .lt. grid2min) .or. (coord_in2max .gt. grid2max) .or. &
+                (coord_in3min .lt. grid3min) .or. (coord_in3max .gt. grid3max)) then
+              print *, 'Error in start points, they have the following extent:'
+              print *, 'Dimension 1 (X), min: ',coord_in1min, ' max: ',coord_in1max
+              print *, 'Dimension 2 (Y), min: ',coord_in2min, ' max: ',coord_in2max
+              print *, 'Dimension 3 (Z), min: ',coord_in3min, ' max: ',coord_in3max
+              print *, 'Calculation will run, but expect some errors in outputs'
+            else
+               print *, 'Start points OK; all inside input grid'
+            end if 
           else if (geometry .eq. 1) then
             print *, 'Dimension 1 (R), min: ',grid1min, ' max: ',grid1max
             print *, 'Dimension 2 (Theta), min: ',grid2min, ' max: ',grid2max
             print *, 'Dimension 3 (Phi), min: ',grid3min, ' max: ',grid3max
+            if ((coord_in1min .lt. grid1min) .or. (coord_in1max .gt. grid1max) .or. &
+                (coord_in2min .lt. grid2min) .or. (coord_in2max .gt. grid2max) .or. &
+                (coord_in3min .lt. grid3min) .or. (coord_in3max .gt. grid3max)) then
+              print *, 'Error in start points, they have the following extent:'
+              print *, 'Dimension 1 (R), min: ',coord_in1min, ' max: ',coord_in1max
+              print *, 'Dimension 2 (Theta), min: ',coord_in2min, ' max: ',coord_in2max
+              print *, 'Dimension 3 (Phi), min: ',coord_in3min, ' max: ',coord_in3max
+              print *, 'Calculation will run, but expect some errors in outputs'
+            else
+               print *, 'Start points OK; all inside input grid'
+            end if 
           end if
-          if ((coord_in1min .lt. grid1min) .or. (coord_in1max .gt. grid1max) .or. &
-              (coord_in2min .lt. grid2min) .or. (coord_in2max .gt. grid2max) .or. &
-              (coord_in3min .lt. grid3min) .or. (coord_in3max .gt. grid3max)) then
-            print *, 'Error in start points, they have the following extent:'
-            print *, 'Dimension 1 (R), min: ',coord_in1min, ' max: ',coord_in1max
-            print *, 'Dimension 2 (Theta), min: ',coord_in2min, ' max: ',coord_in2max
-            print *, 'Dimension 3 (Phi), min: ',coord_in3min, ' max: ',coord_in3max
-            print *, 'Calculation will run, but expect some errors in outputs'
-          else
-             print *, 'Start points OK; all inside input grid'
-          end if 
 
         end if
 
@@ -1145,18 +1142,27 @@ module UFiT_Functions_Fortran
 
       subroutine load_ARMS
 
-        INTEGER :: stp_idx, hdr_unit, flicks_unit, stat, stat2, qtynum, B_start_idx = 0
-        INTEGER :: idx_leaf, idx_blk, idx1, idx2, idx3
-        LOGICAL :: log_grid, stop_found = .false., B_field_found = .false.
-        INTEGER(4) :: ntblks, nlblks, newgrd, nvar = 0
-        REAL(4) :: time
+        INTEGER :: stp_idx, hdr_unit, flicks_unit, stat, stat2, qtynum, B_start_idx
+        INTEGER :: idx_leaf, idx_blk, idx1, idx2, idx3, real_size
+        LOGICAL :: log_grid, stop_found, B_field_found, bfile_exists
+        INTEGER(4) :: ntblks, nlblks, newgrd, nvar
         INTEGER(4) :: iputwrk(21)
-        REAL(4) :: rputwrk(6)
-        REAL(4), DIMENSION(:), ALLOCATABLE :: data_temp
+        REAL(4) :: time32
+        REAL(4) :: rputwrk32(6)
+        REAL(4), DIMENSION(:), ALLOCATABLE :: data_temp32
+        REAL(8) :: time64
+        REAL(8) :: rputwrk64(6)
+        REAL(8), DIMENSION(:), ALLOCATABLE :: data_temp64
         CHARACTER(len=str_mx) :: hdr_line
         CHARACTER(len=4) :: blank4
         CHARACTER(len=8) :: blank8
         CHARACTER(len=25) :: blank25
+        CHARACTER(len=str_mx) :: hdr_filename
+
+        B_start_idx = 0
+        stop_found = .false.
+        B_field_found = .false.
+        nvar = 0
 
         stp_idx = str_mx
         DO WHILE ((stp_idx .gt. 0) .and. (.not. stop_found))
@@ -1166,10 +1172,28 @@ module UFiT_Functions_Fortran
             stp_idx = stp_idx - 1
           end if
         END DO
+        hdr_filename=B_filename(1:stp_idx) // 'hdr'
 
-        open(newunit=hdr_unit,file=B_filename(1:stp_idx) // 'hdr',form="formatted")
+        inquire(file=TRIM(hdr_filename), exist=bfile_exists)
+        IF (.not. bfile_exists) THEN
+          print *, 'Unable to open flicks header file (must end with .hdr)'
+          print *, 'This should be in the same directory as the target flicks file'
+          print *, 'Attemped to read filename: '
+          print *, TRIM(hdr_filename)
+          call EXIT(130)
+        END IF
+        open(newunit=hdr_unit,file=TRIM(hdr_filename),form="formatted")
         read(hdr_unit, '(A)', iostat=stat) hdr_line
-        read(hdr_unit, '(A)', iostat=stat) hdr_line !Possibly get real size from this line?
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        if (hdr_line(6:7) .eq. '32') then
+          real_size = 4
+        else if (hdr_line(6:7) .eq. '64') then
+          real_size = 8
+        else
+          print *, 'Following line could not be interpreted as floating point size:'
+          print *, hdr_line
+          call EXIT(134)
+        end if
         read(hdr_unit, '(A)', iostat=stat) hdr_line
       !Currently defined coordinate types
         if (TRIM(hdr_line) .eq. 'Cartesian') then
@@ -1211,11 +1235,26 @@ module UFiT_Functions_Fortran
           print *, 'ARMS output does not contain Magnetic Field'
           call EXIT(132)
         end if
-        ALLOCATE(data_temp(nvar))
+        if (real_size .eq. 4) then
+          ALLOCATE(data_temp32(nvar))
+        else if (real_size .eq. 8) then
+          ALLOCATE(data_temp64(nvar))
+        end if
 
+        inquire(file=B_filename, exist=bfile_exists)
+        IF (.not. bfile_exists) THEN
+          print *, 'Unable to open flicks file'
+          print *, 'Attemped to read filename: '
+          print *, TRIM(hdr_filename)
+          call EXIT(133)
+        END IF
         open(newunit=flicks_unit,file=B_filename,access='stream',convert='big_endian')
         read(flicks_unit) blank25
-        read(flicks_unit) time
+        if (real_size .eq. 4) then
+          read(flicks_unit) time32
+        else if (real_size .eq. 8) then
+          read(flicks_unit) time64
+        end if
         read(flicks_unit) blank8
         read(flicks_unit) ntblks
         read(flicks_unit) nlblks
@@ -1227,45 +1266,88 @@ module UFiT_Functions_Fortran
         ALLOCATE(grid3_ir(2,num_blocks))
         ALLOCATE(B_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
 
-        idx_leaf = 1
-        DO idx_blk = 1,ntblks
-          read(flicks_unit) blank4
-          read(flicks_unit) iputwrk
-          read(flicks_unit) blank8
-          read(flicks_unit) rputwrk
-          read(flicks_unit) blank4
-          if (iputwrk(3) .eq. 1) then
-            if (log_grid) then
-              grid1_ir(:,idx_leaf) = EXP(rputwrk(1:2))
-            else
-              grid1_ir(:,idx_leaf) = rputwrk(1:2)
-            end if
-            if (geometry .eq. 1) then
-              grid2_ir(:,idx_leaf) = 0.5_num*PI - rputwrk(3:4)
-            else
-              grid2_ir(:,idx_leaf) = rputwrk(3:4)
-            end if
-            if (geometry .eq. 1) then
-              grid3_ir(:,idx_leaf) = rputwrk(5:6) + PI
-            else
-              grid3_ir(:,idx_leaf) = rputwrk(5:6)
-            end if
-            DO idx3 = 1,sz_3
-              DO idx2 = 1,sz_2
-                DO idx1 = 1,sz_1
-                  read(flicks_unit) blank4
-                  read(flicks_unit) data_temp
-                  B_grid_ir(:,idx1,idx2,idx3,idx_leaf)=data_temp(B_start_idx:B_start_idx+2)
-                  read(flicks_unit) blank4
+        if (real_size .eq. 4) then
+          idx_leaf = 1
+          DO idx_blk = 1,ntblks
+            read(flicks_unit) blank4
+            read(flicks_unit) iputwrk
+            read(flicks_unit) blank8
+            read(flicks_unit) rputwrk32
+            read(flicks_unit) blank4
+            if (iputwrk(3) .eq. 1) then
+              if (log_grid) then
+                grid1_ir(:,idx_leaf) = EXP(rputwrk32(1:2))
+              else
+                grid1_ir(:,idx_leaf) = rputwrk32(1:2)
+              end if
+              if (geometry .eq. 1) then
+                grid2_ir(:,idx_leaf) = 0.5_num*PI - rputwrk32(3:4)
+              else
+                grid2_ir(:,idx_leaf) = rputwrk32(3:4)
+              end if
+              if (geometry .eq. 1) then
+                grid3_ir(:,idx_leaf) = rputwrk32(5:6) + PI
+              else
+                grid3_ir(:,idx_leaf) = rputwrk32(5:6)
+              end if
+              DO idx3 = 1,sz_3
+                DO idx2 = 1,sz_2
+                  DO idx1 = 1,sz_1
+                    read(flicks_unit) blank4
+                    read(flicks_unit) data_temp32
+                    B_grid_ir(:,idx1,idx2,idx3,idx_leaf)=data_temp32(B_start_idx:B_start_idx+2)
+                    read(flicks_unit) blank4
+                  END DO
                 END DO
               END DO
-            END DO
-            idx_leaf = idx_leaf + 1
-          end if
-        END DO
+              idx_leaf = idx_leaf + 1
+            end if
+          END DO
+        else if (real_size .eq. 8) then
+          idx_leaf = 1
+          DO idx_blk = 1,ntblks
+            read(flicks_unit) blank4
+            read(flicks_unit) iputwrk
+            read(flicks_unit) blank8
+            read(flicks_unit) rputwrk64
+            read(flicks_unit) blank4
+            if (iputwrk(3) .eq. 1) then
+              if (log_grid) then
+                grid1_ir(:,idx_leaf) = EXP(rputwrk64(1:2))
+              else
+                grid1_ir(:,idx_leaf) = rputwrk64(1:2)
+              end if
+              if (geometry .eq. 1) then
+                grid2_ir(:,idx_leaf) = 0.5_num*PI - rputwrk64(3:4)
+              else
+                grid2_ir(:,idx_leaf) = rputwrk64(3:4)
+              end if
+              if (geometry .eq. 1) then
+                grid3_ir(:,idx_leaf) = rputwrk64(5:6) + PI
+              else
+                grid3_ir(:,idx_leaf) = rputwrk64(5:6)
+              end if
+              DO idx3 = 1,sz_3
+                DO idx2 = 1,sz_2
+                  DO idx1 = 1,sz_1
+                    read(flicks_unit) blank4
+                    read(flicks_unit) data_temp64
+                    B_grid_ir(:,idx1,idx2,idx3,idx_leaf)=data_temp64(B_start_idx:B_start_idx+2)
+                    read(flicks_unit) blank4
+                  END DO
+                END DO
+              END DO
+              idx_leaf = idx_leaf + 1
+            end if
+          END DO
+        end if
 
         close(flicks_unit)
-        DEALLOCATE(data_temp)
+        if (real_size .eq. 4) then
+          DEALLOCATE(data_temp32)
+        else if (real_size .eq. 8) then
+          DEALLOCATE(data_temp64)
+        end if
 
       end subroutine load_ARMS
 
@@ -1285,12 +1367,16 @@ module UFiT_Functions_Fortran
         header_start = trim(header_start) // ' G: ' // trim(string_temp) // ';'
         write(string_temp, '(I0)') input_type
         header_start = trim(header_start) // ' IT: ' // trim(string_temp) // ';'
+        write(string_temp, *) include_curvature
+        header_start = trim(header_start) // ' IC:' // trim(string_temp) // ';'
         write(string_temp, *) save_endpoints
         header_start = trim(header_start) // ' SE:' // trim(string_temp) // ';'
         write(string_temp, *) save_Q
         header_start = trim(header_start) // ' SQ:' // trim(string_temp) // ';'
         write(string_temp, *) save_fieldlines
         header_start = trim(header_start) // ' SF:' // trim(string_temp) // ';'
+        write(string_temp, *) save_connection
+        header_start = trim(header_start) // ' SC:' // trim(string_temp) // ';'
         write(string_temp, *) periodic_X
         header_start = trim(header_start) // ' PX:' // trim(string_temp) // ';'
         write(string_temp, *) periodic_Y
@@ -1337,6 +1423,12 @@ module UFiT_Functions_Fortran
           do idx = 1, numin_tot
             write(out_unit) fieldline_allpos(:,fieldline_pts(idx):fieldline_pts(idx) &
                                              +fieldline_ptn(idx)-1,idx)
+          end do
+        end if
+      !Write connection
+        if (save_connection) then
+          do idx = 1, numin_tot
+            write(out_unit) fieldline_connection(idx)
           end do
         end if
 
@@ -1916,6 +2008,156 @@ module UFiT_Functions_Fortran
       end subroutine check_position_s000
 
 
+      subroutine check_position_s010(pos_in,pos_out,keep_running)
+      !Spherical, non-periodic in r, phi
+      !North theta boundary allows passing through
+
+        REAL(num) :: pos_in(3),pos_out(3)
+        LOGICAL :: keep_running
+
+        keep_running = .true.
+        if (pos_in(2) .lt. 0.0_num) then
+          pos_in(2) = -pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .lt. grid2min) then
+          pos_in(2) = grid2min
+        end if
+        pos_out(:) = pos_in(:)
+
+        if (pos_in(1) .lt. grid1min) then
+          pos_out(1) = grid1min
+          keep_running = .false.
+        else if (pos_in(1) .gt. grid1max) then
+          pos_out(1) = grid1max
+          keep_running = .false.
+        end if
+
+        if (pos_in(2) .lt. grid2min) then
+          pos_out(2) = grid2min
+          keep_running = .false.
+        else if (pos_in(2) .gt. grid2max) then
+          pos_out(2) = grid2max
+          keep_running = .false.
+        end if
+
+        if (pos_in(3) .lt. grid3min) then
+          pos_out(3) = grid3min
+          keep_running = .false.
+        else if (pos_in(3) .gt. grid3max) then
+          pos_out(3) = grid3max
+          keep_running = .false.
+        end if
+
+      end subroutine check_position_s010
+
+
+      subroutine check_position_s020(pos_in,pos_out,keep_running)
+      !Spherical, non-periodic in r, phi
+      !South theta boundary allows passing through
+
+        REAL(num) :: pos_in(3),pos_out(3)
+        LOGICAL :: keep_running
+
+        keep_running = .true.
+        if (pos_in(2) .gt. PI) then
+          pos_in(2) = TWOPI-pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .gt. grid2max) then
+          pos_in(2) = grid2max
+        end if
+        pos_out(:) = pos_in(:)
+
+        if (pos_in(1) .lt. grid1min) then
+          pos_out(1) = grid1min
+          keep_running = .false.
+        else if (pos_in(1) .gt. grid1max) then
+          pos_out(1) = grid1max
+          keep_running = .false.
+        end if
+
+        if (pos_in(2) .lt. grid2min) then
+          pos_out(2) = grid2min
+          keep_running = .false.
+        else if (pos_in(2) .gt. grid2max) then
+          pos_out(2) = grid2max
+          keep_running = .false.
+        end if
+
+        if (pos_in(3) .lt. grid3min) then
+          pos_out(3) = grid3min
+          keep_running = .false.
+        else if (pos_in(3) .gt. grid3max) then
+          pos_out(3) = grid3max
+          keep_running = .false.
+        end if
+
+      end subroutine check_position_s020
+
+
+      subroutine check_position_s030(pos_in,pos_out,keep_running)
+      !Spherical, non-periodic in r, phi
+      !Both theta boundaries allows passing through
+
+        REAL(num) :: pos_in(3),pos_out(3)
+        LOGICAL :: keep_running
+
+        keep_running = .true.
+        if (pos_in(2) .lt. 0.0_num) then
+          pos_in(2) = -pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .lt. grid2min) then
+          pos_in(2) = grid2min
+        else if (pos_in(2) .gt. PI) then
+          pos_in(2) = TWOPI-pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .gt. grid2max) then
+          pos_in(2) = grid2max
+        end if
+        pos_out(:) = pos_in(:)
+
+        if (pos_in(1) .lt. grid1min) then
+          pos_out(1) = grid1min
+          keep_running = .false.
+        else if (pos_in(1) .gt. grid1max) then
+          pos_out(1) = grid1max
+          keep_running = .false.
+        end if
+
+        if (pos_in(2) .lt. grid2min) then
+          pos_out(2) = grid2min
+          keep_running = .false.
+        else if (pos_in(2) .gt. grid2max) then
+          pos_out(2) = grid2max
+          keep_running = .false.
+        end if
+
+        if (pos_in(3) .lt. grid3min) then
+          pos_out(3) = grid3min
+          keep_running = .false.
+        else if (pos_in(3) .gt. grid3max) then
+          pos_out(3) = grid3max
+          keep_running = .false.
+        end if
+
+      end subroutine check_position_s030
+
+
       subroutine check_position_s001(pos_in,pos_out,keep_running)
       !Spherical, periodic in phi, non-periodic in r, theta
 
@@ -1946,9 +2188,141 @@ module UFiT_Functions_Fortran
       end subroutine check_position_s001
 
 
+      subroutine check_position_s011(pos_in,pos_out,keep_running)
+      !Spherical, periodic in phi, non-periodic in r
+      !North theta boundary allows passing through
+
+        REAL(num) :: pos_in(3),pos_out(3)
+        LOGICAL :: keep_running
+
+        keep_running = .true.
+        if (pos_in(2) .lt. 0.0_num) then
+          pos_in(2) = -pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .lt. grid2min) then
+          pos_in(2) = grid2min
+        end if
+        pos_out(:) = pos_in(:)
+
+        if (pos_in(1) .lt. grid1min) then
+          pos_out(1) = grid1min
+          keep_running = .false.
+        else if (pos_in(1) .gt. grid1max) then
+          pos_out(1) = grid1max
+          keep_running = .false.
+        end if
+
+        if (pos_in(2) .lt. grid2min) then
+          pos_out(2) = grid2min
+          keep_running = .false.
+        else if (pos_in(2) .gt. grid2max) then
+          pos_out(2) = grid2max
+          keep_running = .false.
+        end if
+
+        pos_out(3) = MODULO(pos_in(3)-grid3min,coord_width(3))+grid3min
+
+      end subroutine check_position_s011
+
+
+      subroutine check_position_s021(pos_in,pos_out,keep_running)
+      !Spherical, periodic in phi, non-periodic in r
+      !South theta boundary allows passing through
+
+        REAL(num) :: pos_in(3),pos_out(3)
+        LOGICAL :: keep_running
+
+        keep_running = .true.
+        if (pos_in(2) .gt. PI) then
+          pos_in(2) = TWOPI-pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .gt. grid2max) then
+          pos_in(2) = grid2max
+        end if
+        pos_out(:) = pos_in(:)
+
+        if (pos_in(1) .lt. grid1min) then
+          pos_out(1) = grid1min
+          keep_running = .false.
+        else if (pos_in(1) .gt. grid1max) then
+          pos_out(1) = grid1max
+          keep_running = .false.
+        end if
+
+        if (pos_in(2) .lt. grid2min) then
+          pos_out(2) = grid2min
+          keep_running = .false.
+        else if (pos_in(2) .gt. grid2max) then
+          pos_out(2) = grid2max
+          keep_running = .false.
+        end if
+
+        pos_out(3) = MODULO(pos_in(3)-grid3min,coord_width(3))+grid3min
+
+      end subroutine check_position_s021
+
+
+      subroutine check_position_s031(pos_in,pos_out,keep_running)
+      !Spherical, periodic in phi, non-periodic in r
+      !Both theta boundaries allows passing through
+
+        REAL(num) :: pos_in(3),pos_out(3)
+        LOGICAL :: keep_running
+
+        keep_running = .true.
+        if (pos_in(2) .lt. 0.0_num) then
+          pos_in(2) = -pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .lt. grid2min) then
+          pos_in(2) = grid2min
+        else if (pos_in(2) .gt. PI) then
+          pos_in(2) = TWOPI-pos_in(2)
+          if (pos_in(3) .lt. PI) then
+            pos_in(3) = pos_in(3)+PI
+          else
+            pos_in(3) = pos_in(3)-PI
+          end if
+        else if (pos_in(2) .gt. grid2max) then
+          pos_in(2) = grid2max
+        end if
+        pos_out(:) = pos_in(:)
+
+        if (pos_in(1) .lt. grid1min) then
+          pos_out(1) = grid1min
+          keep_running = .false.
+        else if (pos_in(1) .gt. grid1max) then
+          pos_out(1) = grid1max
+          keep_running = .false.
+        end if
+
+        if (pos_in(2) .lt. grid2min) then
+          pos_out(2) = grid2min
+          keep_running = .false.
+        else if (pos_in(2) .gt. grid2max) then
+          pos_out(2) = grid2max
+          keep_running = .false.
+        end if
+
+        pos_out(3) = MODULO(pos_in(3)-grid3min,coord_width(3))+grid3min
+
+      end subroutine check_position_s031
+
+
       subroutine intercept_boundary_s000(pos_in,direction,delta_out)
       !Get distance to nearest boundary
-      !Spherical, non-periodic in X, Y, Z
+      !Spherical, non-periodic in r, theta, phi
 
         REAL(num) :: pos_in(3),direction(3),delta_out
 
@@ -1985,6 +2359,111 @@ module UFiT_Functions_Fortran
       end subroutine intercept_boundary_s000
 
 
+      subroutine intercept_boundary_s010(pos_in,direction,delta_out)
+      !Get distance to nearest boundary
+      !Spherical, non-periodic in r, phi, theta open in North
+
+        REAL(num) :: pos_in(3),direction(3),delta_out
+
+        REAL(num) :: delta(4)
+
+        if (ABS(direction(1)) .lt. EPS) then
+          delta(1) = 1.0_num/EPS
+        else if (direction(1) .lt. 0.0_num) then
+          delta(1) = (grid1min - pos_in(1))/direction(1)
+        else 
+          delta(1) = (grid1max - pos_in(1))/direction(1)
+        end if
+
+        if (ABS(direction(2)) .lt. EPS) then
+          delta(2) = 1.0_num/EPS
+        else if (direction(2) .gt. 0.0_num) then
+          delta(2) = (grid2max - pos_in(2))*pos_in(1)/direction(2)
+        end if
+
+        if (ABS(direction(3)) .lt. EPS) then
+          delta(3) = 1.0_num/EPS
+        else if (direction(3) .lt. 0.0_num) then
+          delta(3) = (grid3min - pos_in(3))*pos_in(1)*SIN(pos_in(2))/direction(3)
+        else 
+          delta(3) = (grid3max - pos_in(3))*pos_in(1)*SIN(pos_in(2))/direction(3)
+        end if
+
+        delta(4) = 1.0_num
+
+        delta_out = MINVAL(delta)
+
+      end subroutine intercept_boundary_s010
+
+
+      subroutine intercept_boundary_s020(pos_in,direction,delta_out)
+      !Get distance to nearest boundary
+      !Spherical, non-periodic in r, phi, theta open in South
+
+        REAL(num) :: pos_in(3),direction(3),delta_out
+
+        REAL(num) :: delta(4)
+
+        if (ABS(direction(1)) .lt. EPS) then
+          delta(1) = 1.0_num/EPS
+        else if (direction(1) .lt. 0.0_num) then
+          delta(1) = (grid1min - pos_in(1))/direction(1)
+        else 
+          delta(1) = (grid1max - pos_in(1))/direction(1)
+        end if
+
+        if (ABS(direction(2)) .lt. EPS) then
+          delta(2) = 1.0_num/EPS
+        else if (direction(2) .lt. 0.0_num) then
+          delta(2) = (grid2min - pos_in(2))*pos_in(1)/direction(2)
+        end if
+
+        if (ABS(direction(3)) .lt. EPS) then
+          delta(3) = 1.0_num/EPS
+        else if (direction(3) .lt. 0.0_num) then
+          delta(3) = (grid3min - pos_in(3))*pos_in(1)*SIN(pos_in(2))/direction(3)
+        else 
+          delta(3) = (grid3max - pos_in(3))*pos_in(1)*SIN(pos_in(2))/direction(3)
+        end if
+
+        delta(4) = 1.0_num
+
+        delta_out = MINVAL(delta)
+
+      end subroutine intercept_boundary_s020
+
+
+      subroutine intercept_boundary_s030(pos_in,direction,delta_out)
+      !Get distance to nearest boundary
+      !Spherical, non-periodic in r, phi, theta open in both boundaries
+
+        REAL(num) :: pos_in(3),direction(3),delta_out
+
+        REAL(num) :: delta(3)
+
+        if (ABS(direction(1)) .lt. EPS) then
+          delta(1) = 1.0_num/EPS
+        else if (direction(1) .lt. 0.0_num) then
+          delta(1) = (grid1min - pos_in(1))/direction(1)
+        else 
+          delta(1) = (grid1max - pos_in(1))/direction(1)
+        end if
+
+        if (ABS(direction(3)) .lt. EPS) then
+          delta(2) = 1.0_num/EPS
+        else if (direction(3) .lt. 0.0_num) then
+          delta(2) = (grid3min - pos_in(3))*pos_in(1)*SIN(pos_in(2))/direction(3)
+        else 
+          delta(2) = (grid3max - pos_in(3))*pos_in(1)*SIN(pos_in(2))/direction(3)
+        end if
+
+        delta(3) = 1.0_num
+
+        delta_out = MINVAL(delta)
+
+      end subroutine intercept_boundary_s030
+
+
       subroutine intercept_boundary_s001(pos_in,direction,delta_out)
       !Get distance to nearest boundary
       !Spherical, periodic in phi, non-periodic in r, theta
@@ -2014,6 +2493,87 @@ module UFiT_Functions_Fortran
         delta_out = MINVAL(delta)
 
       end subroutine intercept_boundary_s001
+
+
+      subroutine intercept_boundary_s011(pos_in,direction,delta_out)
+      !Get distance to nearest boundary
+      !Spherical, non-periodic in r, phi, theta open in North
+
+        REAL(num) :: pos_in(3),direction(3),delta_out
+
+        REAL(num) :: delta(3)
+
+        if (ABS(direction(1)) .lt. EPS) then
+          delta(1) = 1.0_num/EPS
+        else if (direction(1) .lt. 0.0_num) then
+          delta(1) = (grid1min - pos_in(1))/direction(1)
+        else 
+          delta(1) = (grid1max - pos_in(1))/direction(1)
+        end if
+
+        if (ABS(direction(2)) .lt. EPS) then
+          delta(2) = 1.0_num/EPS
+        else if (direction(2) .gt. 0.0_num) then
+          delta(2) = (grid2max - pos_in(2))*pos_in(1)/direction(2)
+        end if
+
+        delta(3) = 1.0_num
+
+        delta_out = MINVAL(delta)
+
+      end subroutine intercept_boundary_s011
+
+
+      subroutine intercept_boundary_s021(pos_in,direction,delta_out)
+      !Get distance to nearest boundary
+      !Spherical, non-periodic in r, phi, theta open in South
+
+        REAL(num) :: pos_in(3),direction(3),delta_out
+
+        REAL(num) :: delta(3)
+
+        if (ABS(direction(1)) .lt. EPS) then
+          delta(1) = 1.0_num/EPS
+        else if (direction(1) .lt. 0.0_num) then
+          delta(1) = (grid1min - pos_in(1))/direction(1)
+        else 
+          delta(1) = (grid1max - pos_in(1))/direction(1)
+        end if
+
+        if (ABS(direction(2)) .lt. EPS) then
+          delta(2) = 1.0_num/EPS
+        else if (direction(2) .lt. 0.0_num) then
+          delta(2) = (grid2min - pos_in(2))*pos_in(1)/direction(2)
+        end if
+
+        delta(3) = 1.0_num
+
+        delta_out = MINVAL(delta)
+
+      end subroutine intercept_boundary_s021
+
+
+      subroutine intercept_boundary_s031(pos_in,direction,delta_out)
+      !Get distance to nearest boundary
+      !Spherical, non-periodic in r, phi, theta open in both boundaries
+
+        REAL(num) :: pos_in(3),direction(3),delta_out
+
+        REAL(num) :: delta(2)
+
+        if (ABS(direction(1)) .lt. EPS) then
+          delta(1) = 1.0_num/EPS
+        else if (direction(1) .lt. 0.0_num) then
+          delta(1) = (grid1min - pos_in(1))/direction(1)
+        else 
+          delta(1) = (grid1max - pos_in(1))/direction(1)
+        end if
+
+        delta(2) = 1.0_num
+
+        delta_out = MINVAL(delta)
+
+      end subroutine intercept_boundary_s031
 
 
       subroutine create_perpendicular_vectors(vec_in,u_out,v_out)
@@ -2513,13 +3073,13 @@ module UFiT_Functions_Fortran
         k_1(:) = B_curr(:)*dl_norm
 
         pos_out(:) = pos_in(:) + k_1(:)
-        call check_position(pos_out,pos_out,keep_running)
+        call check_position(pos_out,pos_0out,keep_running)
 
       end subroutine step_cartesian
 
 
       subroutine step_cartesian_RK4(idx_x, idx_y, idx_z, pos_in, pos_out, dl, keep_running, &
-                                check_position, B_interp)
+                                check_position, B_interp) !TODO - fix and use this
 
         INTEGER :: idx_x, idx_y, idx_z
         REAL(num) :: pos_in(3),pos_out(3),dl
@@ -2632,7 +3192,7 @@ module UFiT_Functions_Fortran
                   *dl_norm
 
         pos_out(:) = pos_in(:) + k_1(:)
-        call check_position(pos_out,pos_out,keep_running)
+        call check_position(pos_out,pos_0out,keep_running)
         IF (keep_running) THEN
           u_vec(:) = u_vec(:) + k_1u(:)
           v_vec(:) = v_vec(:) + k_1v(:)
@@ -2642,7 +3202,7 @@ module UFiT_Functions_Fortran
 
 
       subroutine step_cartesianQ_RK4(idx_x, idx_y, idx_z, pos_in, pos_out, u_vec, v_vec, dl, &
-                                 keep_running, check_position, B_gradB_interp)
+                                 keep_running, check_position, B_gradB_interp) !TODO - fix and use this
 
         INTEGER :: idx_x, idx_y, idx_z
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
@@ -2876,6 +3436,22 @@ module UFiT_Functions_Fortran
         end if
         pos_endpoints(4:6,idx_t) = pos_next(:)
 
+        if (save_connection) then
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
+
       end subroutine trace_cartesian
 
 
@@ -3014,6 +3590,22 @@ module UFiT_Functions_Fortran
                                B_interp, B_gradB_interp)
         end if
         pos_endpoints(4:6,idx_t) = pos_fieldline(:,step_total+step_start-1,idx_t)
+
+        if (save_connection) then
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
 
       end subroutine trace_cartesian_f
 
@@ -3179,6 +3771,22 @@ module UFiT_Functions_Fortran
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
                        vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
                        *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
+
+        if (save_connection) then
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
 
       end subroutine trace_cartesian_Q
 
@@ -3350,6 +3958,22 @@ module UFiT_Functions_Fortran
                        vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
                        *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
 
+        if (save_connection) then
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
+
       end subroutine trace_cartesian_Qf
 
 
@@ -3396,7 +4020,7 @@ module UFiT_Functions_Fortran
         k_1(3) = B_curr(3)*dl_norm/pos_0out(1)/SIN(pos_0out(2))
 
         pos_out(:) = pos_in(:) + k_1(:)
-        call check_position(pos_out,pos_out,keep_running)
+        call check_position(pos_out,pos_0out,keep_running)
 
       end subroutine step_spherical
 
@@ -3480,7 +4104,7 @@ module UFiT_Functions_Fortran
                   *dl_norm/r_sin_th
 
         pos_out(:) = pos_in(:) + k_1(:)
-        call check_position(pos_out,pos_out,keep_running)
+        call check_position(pos_out,pos_0out,keep_running)
         IF (keep_running) THEN
           u_vec(:) = u_vec(:) + k_1u(:)
           v_vec(:) = v_vec(:) + k_1v(:)
@@ -3554,7 +4178,7 @@ module UFiT_Functions_Fortran
                   +(v_vec(3)*B_curr(2)-v_vec(2)*B_curr(3))*cot_th)/pos_0out(1))*dl_norm
 
         pos_out(:) = pos_in(:) + k_1(:)
-        call check_position(pos_out,pos_out,keep_running)
+        call check_position(pos_out,pos_0out,keep_running)
         IF (keep_running) THEN
           u_vec(:) = u_vec(:) + k_1u(:)
           v_vec(:) = v_vec(:) + k_1v(:)
@@ -3694,6 +4318,22 @@ module UFiT_Functions_Fortran
         end if
         pos_endpoints(4:6,idx_t) = pos_next(:)
 
+        if (save_connection) then
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
+
       end subroutine trace_spherical
 
 
@@ -3832,6 +4472,22 @@ module UFiT_Functions_Fortran
                                B_interp, B_gradB_interp)
         end if
         pos_endpoints(4:6,idx_t) = pos_fieldline(:,step_total+step_start-1,idx_t)
+
+        if (save_connection) then
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
 
       end subroutine trace_spherical_f
 
@@ -3997,6 +4653,22 @@ module UFiT_Functions_Fortran
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
                        vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
                        *vecdot(u_downt,v_downt))*Q_sign*mod_Bup*mod_Bdown/(mod_B0**2)
+
+        if (save_connection) then
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
 
       end subroutine trace_spherical_Q
 
@@ -4167,6 +4839,22 @@ module UFiT_Functions_Fortran
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
                         vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
                         *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
+
+        if (save_connection) then
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 0   !Closed
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            end if
+          else                                                                   !one end away from photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+              fieldline_connection(idx_t) = 1   !Open
+            else                                                                 !second end away from photosphere
+              fieldline_connection(idx_t) = 2   !disconnected
+            end if
+          end if
+        end if
 
       end subroutine trace_spherical_Qf
 
@@ -4339,7 +5027,8 @@ module UFiT_Functions_Fortran
         procedure (single_step), pointer :: step_ptr => null ()
         procedure (trace_fl), pointer :: tr_ptr => null ()
 
-        if ((.not. save_endpoints) .and. (.not. save_Q) .and. (.not. save_fieldlines)) then
+        if ((.not. save_endpoints) .and. (.not. save_Q) .and. (.not. save_connection) .and. &
+            (.not. save_fieldlines) .and. (.not. user_defined)) then
           save_endpoints = .true.
         end if
 
@@ -4351,6 +5040,12 @@ module UFiT_Functions_Fortran
         end if
         if (save_Q) then
           ALLOCATE(fieldline_Q(numin_tot))
+        end if
+        if (save_connection) then
+          ALLOCATE(fieldline_connection(numin_tot))
+        end if
+        if (user_defined) then
+          call prepare_user_defined
         end if
 
         if (input_type .eq. 0) then
@@ -4375,7 +5070,10 @@ module UFiT_Functions_Fortran
 
         if (geometry .eq. 0) then !Cartesian
 
-          if (save_Q .and. save_fieldlines) then
+          if (user_defined) then
+            step_ptr => step_cartesian
+            tr_ptr => trace_cartesian_user
+          else if (save_Q .and. save_fieldlines) then
             step_ptr => step_cartesianQ
             tr_ptr => trace_cartesian_Qf
           else if (save_Q .and. (.not. save_fieldlines)) then
@@ -4417,7 +5115,10 @@ module UFiT_Functions_Fortran
 
         else if (geometry .eq. 1) then !Spherical
 
-          if (save_Q .and. save_fieldlines) then
+          if (user_defined) then
+            step_ptr => step_spherical
+            tr_ptr => trace_spherical_user
+          else if (save_Q .and. save_fieldlines) then
             if (include_curvature) then
               step_ptr => step_sphericalQic
             else
@@ -4439,12 +5140,37 @@ module UFiT_Functions_Fortran
             tr_ptr => trace_spherical
           end if
 
+          !If theta boundary is within theta_periodicity_threshold, it's open - field lines can pass over pole if necessary
           if (periodic_PHI) then
-            cpos_ptr => check_position_s001
-            ibdry_ptr => intercept_boundary_s001
+            if ((grid2min .lt. theta_periodicity_threshold) .and. &
+                (grid2max .gt. PI-theta_periodicity_threshold)) then
+              cpos_ptr => check_position_s031
+              ibdry_ptr => intercept_boundary_s031
+            else if (grid2min .lt. theta_periodicity_threshold) then
+              cpos_ptr => check_position_s011
+              ibdry_ptr => intercept_boundary_s011
+            else if (grid2max .gt. PI-theta_periodicity_threshold) then
+              cpos_ptr => check_position_s021
+              ibdry_ptr => intercept_boundary_s021
+            else
+              cpos_ptr => check_position_s001
+              ibdry_ptr => intercept_boundary_s001
+            end if
           else if ((.not. periodic_PHI)) then
-            cpos_ptr => check_position_s000
-            ibdry_ptr => intercept_boundary_s000
+            if ((grid2min .lt. theta_periodicity_threshold) .and. &
+                (grid2max .gt. PI-theta_periodicity_threshold)) then
+              cpos_ptr => check_position_s030
+              ibdry_ptr => intercept_boundary_s030
+            else if (grid2min .lt. theta_periodicity_threshold) then
+              cpos_ptr => check_position_s010
+              ibdry_ptr => intercept_boundary_s010
+            else if (grid2max .gt. PI-theta_periodicity_threshold) then
+              cpos_ptr => check_position_s020
+              ibdry_ptr => intercept_boundary_s020
+            else
+              cpos_ptr => check_position_s000
+              ibdry_ptr => intercept_boundary_s000
+            end if
           end if
 
         end if

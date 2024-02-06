@@ -1,18 +1,57 @@
 !To compile without the makefile, run the following line (without leading exclamation mark):
 !gfortran -shared -fPIC UFiT_Functions_Fortran.F90 Run_UFiT.F90 -O3 -fopenmp -o UFiT_Python_Callable.so
 
-subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_regular, &
-                                IN_periodic_X,IN_periodic_Y,IN_periodic_Z,IN_periodic_PHI, &
-                                IN_print_devices,IN_save_endpoints,IN_save_Q,IN_save_fieldlines, &
-                                IN_check_starts,IN_normalized_B,IN_include_curvature,IN_num_proc, &
-                                IN_MAX_STEPS,IN_step_size,IN_B_filename,IN_out_filename, &
-                                IN_load_B,IN_numin_tot,IN_numin1,IN_numin2,IN_numin3,IN_coord1, &
-                                IN_coord2,IN_coord3,IN_sz1,IN_sz2,IN_sz3,IN_num_blocks,IN_grid1, &
-                                IN_grid2,IN_grid3,IN_B_grid,IN_grid1_ir,IN_grid2_ir,IN_grid3_ir, &
-                                IN_B_grid_ir,IN_write_output,IN_return_output, &
-                                OUT_fieldline_endpoints,OUT_fieldline_allpos,OUT_fieldline_pts, &
-                                OUT_fieldline_ptn,OUT_fieldline_Q &
-                                )  bind(c, name='UFiT_Python_Callable')
+subroutine UFiT_Python_Callable(IN_geometry, &
+                                IN_Bfile_type, &
+                                IN_input_type, &
+                                IN_grid_regular, &
+                                IN_periodic_X, &
+                                IN_periodic_Y, &
+                                IN_periodic_Z, &
+                                IN_periodic_PHI, &
+                                IN_print_devices, &
+                                IN_save_endpoints, &
+                                IN_save_Q, &
+                                IN_save_fieldlines, &
+                                IN_save_connection, &
+                                IN_user_defined, &
+                                IN_check_starts, &
+                                IN_normalized_B, &
+                                IN_include_curvature, &
+                                IN_num_proc, &
+                                IN_MAX_STEPS, &
+                                IN_step_size, &
+                                IN_B_filename, &
+                                IN_out_filename, &
+                                IN_load_B, &
+                                IN_numin_tot, &
+                                IN_numin1, &
+                                IN_numin2, &
+                                IN_numin3, &
+                                IN_coord1, &
+                                IN_coord2, &
+                                IN_coord3, &
+                                IN_sz1, &
+                                IN_sz2, &
+                                IN_sz3, &
+                                IN_num_blocks, &
+                                IN_grid1, &
+                                IN_grid2, &
+                                IN_grid3, &
+                                IN_B_grid, &
+                                IN_grid1_ir, &
+                                IN_grid2_ir, &
+                                IN_grid3_ir, &
+                                IN_B_grid_ir, &
+                                IN_write_output, &
+                                IN_return_output, &
+                                OUT_fieldline_endpoints, &
+                                OUT_fieldline_allpos, &
+                                OUT_fieldline_pts, &
+                                OUT_fieldline_ptn, &
+                                OUT_fieldline_Q, &
+                                OUT_fieldline_connection, &
+                                OUT_fieldline_user)  bind(c, name='UFiT_Python_Callable')
 
       use iso_c_binding
       use UFiT_Functions_Fortran
@@ -30,6 +69,8 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
       integer(c_int), intent(in), value :: IN_save_endpoints
       integer(c_int), intent(in), value :: IN_save_Q
       integer(c_int), intent(in), value :: IN_save_fieldlines
+      integer(c_int), intent(in), value :: IN_save_connection
+      integer(c_int), intent(in), value :: IN_user_defined
       integer(c_int), intent(in), value :: IN_check_starts
       integer(c_int), intent(in), value :: IN_normalized_B
       integer(c_int), intent(in), value :: IN_include_curvature
@@ -65,6 +106,8 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
       integer(c_int), intent(out) :: OUT_fieldline_pts(IN_numin_tot)
       integer(c_int), intent(out) :: OUT_fieldline_ptn(IN_numin_tot)
       REAL(c_double), intent(out) :: OUT_fieldline_Q(IN_numin_tot)
+      BYTE, intent(out) :: OUT_fieldline_connection(IN_numin_tot)
+      REAL(c_double), intent(out) :: OUT_fieldline_user(1,IN_numin_tot)
 
 
       geometry = IN_geometry
@@ -79,6 +122,8 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
       save_endpoints = cint_to_logical(IN_save_endpoints)
       save_Q = cint_to_logical(IN_save_Q)
       save_fieldlines = cint_to_logical(IN_save_fieldlines)
+      save_connection = cint_to_logical(IN_save_connection)
+      user_defined = cint_to_logical(IN_user_defined)
       check_starts = cint_to_logical(IN_check_starts)
       normalized_B = cint_to_logical(IN_normalized_B)
       include_curvature = cint_to_logical(IN_include_curvature)
@@ -142,7 +187,9 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
         call write_output
       end if
       if (IN_return_output .eq. 1) then
-        OUT_fieldline_endpoints(:,:) = fieldline_endpoints(:,:)
+        if (save_endpoints) then
+          OUT_fieldline_endpoints(:,:) = fieldline_endpoints(:,:)
+        end if
         if (save_fieldlines) then
           OUT_fieldline_allpos(:,:,:) = fieldline_allpos(:,:,:)
           OUT_fieldline_pts(:) = fieldline_pts(:)
@@ -150,6 +197,12 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
         end if
         if (save_Q) then
           OUT_fieldline_Q(:) = fieldline_Q(:)
+        end if
+        if (save_connection) then
+          OUT_fieldline_connection(:) = fieldline_connection(:)
+        end if
+        if (user_defined) then
+          OUT_fieldline_user(:,:) = fieldline_user(:,:)
         end if
       end if
 
@@ -169,6 +222,8 @@ subroutine UFiT_Python_Callable(IN_geometry,IN_Bfile_type,IN_input_type,IN_grid_
       IF (ALLOCATED(fieldline_pts)) DEALLOCATE(fieldline_pts)
       IF (ALLOCATED(fieldline_ptn)) DEALLOCATE(fieldline_ptn)
       IF (ALLOCATED(fieldline_Q)) DEALLOCATE(fieldline_Q)
+      IF (ALLOCATED(fieldline_connection)) DEALLOCATE(fieldline_connection)
+      IF (ALLOCATED(fieldline_user)) DEALLOCATE(fieldline_user)
 
       contains
 

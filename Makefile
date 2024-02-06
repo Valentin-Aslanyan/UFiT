@@ -29,8 +29,8 @@ endif
 EXECUTABLE = Run_UFiT
 LIBSO = UFiT_Python_Callable.so
 
-EXECUTABLE_SRC = UFiT_Functions_Fortran.F90 Run_UFiT.F90
-LIBSO_SRC = UFiT_Functions_Fortran.F90 UFiT_Python_Callable.F90
+EXECUTABLE_SRC = UFiT_Definitions_Fortran.F90 UFiT_User_Functions.F90 UFiT_Functions_Fortran.F90 Run_UFiT.F90
+LIBSO_SRC = UFiT_Definitions_Fortran.F90 UFiT_User_Functions.F90 UFiT_Functions_Fortran.F90 UFiT_Python_Callable.F90
 
 # Rule to build the fortran files
 
