@@ -3437,14 +3437,14 @@ module UFiT_Functions_Fortran
         pos_endpoints(4:6,idx_t) = pos_next(:)
 
         if (save_connection) then
-          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -3592,14 +3592,14 @@ module UFiT_Functions_Fortran
         pos_endpoints(4:6,idx_t) = pos_fieldline(:,step_total+step_start-1,idx_t)
 
         if (save_connection) then
-          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -3762,8 +3762,8 @@ module UFiT_Functions_Fortran
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
 
-        if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min) .and. &
-            (pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then
+        if ((pos_endpoints(3,idx_t) .lt. closed_fl_size) .and. &
+            (pos_endpoints(6,idx_t) .lt. closed_fl_size)) then
           Q_sign=1.0_num
         else
           Q_sign=-1.0_num
@@ -3773,14 +3773,14 @@ module UFiT_Functions_Fortran
                        *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
 
         if (save_connection) then
-          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -3948,8 +3948,8 @@ module UFiT_Functions_Fortran
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
 
-        if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min) .and. &
-            (pos_endpoints(6,idx_t).lt. closed_fl_constant*grid3min)) then
+        if ((pos_endpoints(3,idx_t) .lt. closed_fl_size) .and. &
+            (pos_endpoints(6,idx_t).lt. closed_fl_size)) then
           Q_sign=1.0_num
         else
           Q_sign=-1.0_num
@@ -3959,14 +3959,14 @@ module UFiT_Functions_Fortran
                        *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
 
         if (save_connection) then
-          if ((pos_endpoints(3,idx_t) .lt. closed_fl_constant*grid3min)) then    !one end at photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+          if ((pos_endpoints(3,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(6,idx_t) .lt. closed_fl_constant*grid3min)) then  !second end at photosphere
+            if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -4319,14 +4319,14 @@ module UFiT_Functions_Fortran
         pos_endpoints(4:6,idx_t) = pos_next(:)
 
         if (save_connection) then
-          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -4474,14 +4474,14 @@ module UFiT_Functions_Fortran
         pos_endpoints(4:6,idx_t) = pos_fieldline(:,step_total+step_start-1,idx_t)
 
         if (save_connection) then
-          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -4644,8 +4644,8 @@ module UFiT_Functions_Fortran
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
 
-        if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min) .and. &
-            (pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then
+        if ((pos_endpoints(1,idx_t) .lt. closed_fl_size) .and. &
+            (pos_endpoints(4,idx_t).lt. closed_fl_size)) then
           Q_sign=1.0_num
         else
           Q_sign=-1.0_num
@@ -4655,14 +4655,14 @@ module UFiT_Functions_Fortran
                        *vecdot(u_downt,v_downt))*Q_sign*mod_Bup*mod_Bdown/(mod_B0**2)
 
         if (save_connection) then
-          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -4830,8 +4830,8 @@ module UFiT_Functions_Fortran
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
 
-        if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min) .and. &
-            (pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then
+        if ((pos_endpoints(1,idx_t) .lt. closed_fl_size) .and. &
+            (pos_endpoints(4,idx_t).lt. closed_fl_size)) then
           Q_sign=1.0_num
         else
           Q_sign=-1.0_num
@@ -4841,14 +4841,14 @@ module UFiT_Functions_Fortran
                         *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
 
         if (save_connection) then
-          if ((pos_endpoints(1,idx_t) .lt. closed_fl_constant*grid1min)) then    !one end at photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+          if ((pos_endpoints(1,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 0   !Closed
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 1   !Open
             end if
           else                                                                   !one end away from photosphere
-            if ((pos_endpoints(4,idx_t).lt. closed_fl_constant*grid1min)) then  !second end at photosphere
+            if ((pos_endpoints(4,idx_t).lt. closed_fl_size)) then                !second end at photosphere
               fieldline_connection(idx_t) = 1   !Open
             else                                                                 !second end away from photosphere
               fieldline_connection(idx_t) = 2   !disconnected
@@ -5113,6 +5113,8 @@ module UFiT_Functions_Fortran
             ibdry_ptr => intercept_boundary_c000
           end if
 
+          closed_fl_size=closed_fl_constant*(grid3max-grid3min)+grid3min
+
         else if (geometry .eq. 1) then !Spherical
 
           if (user_defined) then
@@ -5172,6 +5174,8 @@ module UFiT_Functions_Fortran
               ibdry_ptr => intercept_boundary_s000
             end if
           end if
+
+          closed_fl_size=closed_fl_constant*(grid1max-grid1min)+grid1min
 
         end if
 
