@@ -118,6 +118,7 @@ module UFiT_Functions_Fortran
                 normalized_B = .true.
 
               case ('-ic', '--include_curvature')
+                !Note: this option is now deprecated and curvature is included by default
                 include_curvature = .true.
 
               case ('-np', '--num_proc', '--NUM_PROC')
@@ -286,6 +287,7 @@ module UFiT_Functions_Fortran
                   end if
 
                 case ('IC:')
+                !Note: this option is now deprecated and curvature is included by default
                   read(arg2,*,iostat=stat2) include_curvature
                   if (stat2 .ne. 0) then
                     print *, 'unrecognised curvature option: ', TRIM(arg2)
@@ -3768,9 +3770,16 @@ module UFiT_Functions_Fortran
         else
           Q_sign=-1.0_num
         end if
+        !mod-B normalization
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
                        vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
                        *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
+        !determinant normalization
+        !pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
+        !               vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt)* &
+        !               vecdot(u_downt,v_downt))*Q_sign/SQRT(vecdot(u_downt,u_downt)* &
+        !               vecdot(v_downt,v_downt)-(vecdot(u_downt,v_downt))**2)/SQRT( &
+        !               vecdot(u_upt,u_upt)*vecdot(v_upt,v_upt)-(vecdot(u_upt,v_upt))**2)
 
         if (save_connection) then
           if ((pos_endpoints(3,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
@@ -3954,9 +3963,16 @@ module UFiT_Functions_Fortran
         else
           Q_sign=-1.0_num
         end if
+        !mod-B normalization
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
                        vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
                        *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
+        !determinant normalization
+        !pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
+        !               vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt)* &
+        !               vecdot(u_downt,v_downt))*Q_sign/SQRT(vecdot(u_downt,u_downt)* &
+        !               vecdot(v_downt,v_downt)-(vecdot(u_downt,v_downt))**2)/SQRT( &
+        !               vecdot(u_upt,u_upt)*vecdot(v_upt,v_upt)-(vecdot(u_upt,v_upt))**2)
 
         if (save_connection) then
           if ((pos_endpoints(3,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
@@ -4025,8 +4041,9 @@ module UFiT_Functions_Fortran
       end subroutine step_spherical
 
 
-      subroutine step_sphericalQ(idx_r, idx_t, idx_p, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_sphericalQnoc(idx_r, idx_t, idx_p, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_interp, B_gradB_interp)
+      !This subroutine is now deprecated; in principle, it should approach QSLsquasher
       !Note - gradB_curr is just partial derivatives, not actual gradient in sphericals
 
         INTEGER :: idx_r, idx_t, idx_p
@@ -4102,6 +4119,19 @@ module UFiT_Functions_Fortran
                   *dl_norm/pos_0out(1)
         k_1v(3) = (v_vec(1)*gradB_curr(3,1)+v_vec(2)*gradB_curr(3,2)+v_vec(3)*gradB_curr(3,3))&
                   *dl_norm/r_sin_th
+      !Another approach to taking the gradient
+        !k_1u(1) = (u_vec(1)*gradB_curr(1,1)+u_vec(2)*gradB_curr(1,2)/pos_0out(1) &
+        !          +u_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        !k_1u(2) = (u_vec(1)*gradB_curr(2,1)+u_vec(2)*gradB_curr(2,2)/pos_0out(1) &
+        !          +u_vec(3)*gradB_curr(2,3)/r_sin_th)*dl_norm
+        !k_1u(3) = (u_vec(1)*gradB_curr(3,1)+u_vec(2)*gradB_curr(3,2)/pos_0out(1) &
+        !          +u_vec(3)*gradB_curr(3,3)/r_sin_th)*dl_norm
+        !k_1v(1) = (v_vec(1)*gradB_curr(1,1)+v_vec(2)*gradB_curr(1,2)/pos_0out(1) &
+        !          +v_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        !k_1v(2) = (v_vec(1)*gradB_curr(2,1)+v_vec(2)*gradB_curr(2,2)/pos_0out(1) &
+        !          +v_vec(3)*gradB_curr(2,3)/r_sin_th)*dl_norm
+        !k_1v(3) = (v_vec(1)*gradB_curr(3,1)+v_vec(2)*gradB_curr(3,2)/pos_0out(1) &
+        !          +v_vec(3)*gradB_curr(3,3)/r_sin_th)*dl_norm
 
         pos_out(:) = pos_in(:) + k_1(:)
         call check_position(pos_out,pos_0out,keep_running)
@@ -4110,10 +4140,10 @@ module UFiT_Functions_Fortran
           v_vec(:) = v_vec(:) + k_1v(:)
         END IF
 
-      end subroutine step_sphericalQ
+      end subroutine step_sphericalQnoc
 
 
-      subroutine step_sphericalQic(idx_r, idx_t, idx_p, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_sphericalQ(idx_r, idx_t, idx_p, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_interp, B_gradB_interp)
       !Note - gradB_curr is just partial derivatives, not actual gradient in sphericals
       !include curvature 
@@ -4184,7 +4214,7 @@ module UFiT_Functions_Fortran
           v_vec(:) = v_vec(:) + k_1v(:)
         END IF
 
-      end subroutine step_sphericalQic
+      end subroutine step_sphericalQ
 
 
       subroutine trace_spherical(check_position,intercept_boundary,B_interp,B_gradB_interp, &
@@ -4650,9 +4680,16 @@ module UFiT_Functions_Fortran
         else
           Q_sign=-1.0_num
         end if
+        !mod-B normalization
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
                        vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
                        *vecdot(u_downt,v_downt))*Q_sign*mod_Bup*mod_Bdown/(mod_B0**2)
+        !determinant normalization
+        !pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
+        !               vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt)* &
+        !               vecdot(u_downt,v_downt))*Q_sign/SQRT(vecdot(u_downt,u_downt)* &
+        !               vecdot(v_downt,v_downt)-(vecdot(u_downt,v_downt))**2)/SQRT( &
+        !               vecdot(u_upt,u_upt)*vecdot(v_upt,v_upt)-(vecdot(u_upt,v_upt))**2)
 
         if (save_connection) then
           if ((pos_endpoints(1,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
@@ -4836,9 +4873,16 @@ module UFiT_Functions_Fortran
         else
           Q_sign=-1.0_num
         end if
+        !mod-B normalization
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
                         vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
-                        *vecdot(u_downt,v_downt))*mod_Bup*mod_Bdown/(mod_B0**2)*Q_sign
+                        *vecdot(u_downt,v_downt))*Q_sign*mod_Bup*mod_Bdown/(mod_B0**2)
+        !determinant normalization
+        !pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
+        !               vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt)* &
+        !               vecdot(u_downt,v_downt))*Q_sign/SQRT(vecdot(u_downt,u_downt)* &
+        !               vecdot(v_downt,v_downt)-(vecdot(u_downt,v_downt))**2)/SQRT( &
+        !               vecdot(u_upt,u_upt)*vecdot(v_upt,v_upt)-(vecdot(u_upt,v_upt))**2)
 
         if (save_connection) then
           if ((pos_endpoints(1,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
@@ -5121,18 +5165,10 @@ module UFiT_Functions_Fortran
             step_ptr => step_spherical
             tr_ptr => trace_spherical_user
           else if (save_Q .and. save_fieldlines) then
-            if (include_curvature) then
-              step_ptr => step_sphericalQic
-            else
-              step_ptr => step_sphericalQ
-            end if
+            step_ptr => step_sphericalQ
             tr_ptr => trace_spherical_Qf
           else if (save_Q .and. (.not. save_fieldlines)) then
-            if (include_curvature) then
-              step_ptr => step_sphericalQic
-            else
-              step_ptr => step_sphericalQ
-            end if
+            step_ptr => step_sphericalQ
             tr_ptr => trace_spherical_Q
           else if ((.not. save_Q) .and. save_fieldlines) then
             step_ptr => step_spherical
