@@ -137,7 +137,7 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.write_output = False
 		self.return_output = False
 		self.endpoints = np.zeros((6,2),dtype="double")
-		self.fieldline_allpos = np.zeros((3,10001,1),dtype="double")
+		self.fieldline_allpos = np.zeros((1,10001,3),dtype="double")
 		self.fieldline_pts = np.zeros((1),dtype="int32")
 		self.fieldline_ptn = np.zeros((1),dtype="int32")
 		self.Q_out = np.zeros((2),dtype="double")
@@ -243,7 +243,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 		UFiT_input.numin_tot=UFiT_input.numin1*UFiT_input.numin2*UFiT_input.numin3
 	UFiT_input.endpoints = np.zeros((6,UFiT_input.numin_tot),dtype="double")
 	if UFiT_input.save_fieldlines:
-		UFiT_input.fieldline_allpos = np.zeros((3,2*UFiT_input.MAX_STEPS+1,UFiT_input.numin_tot),dtype="double")
+		UFiT_input.fieldline_allpos = np.zeros((UFiT_input.numin_tot,2*UFiT_input.MAX_STEPS+1,3),dtype="double")
 		UFiT_input.fieldline_pts = np.zeros((UFiT_input.numin_tot),dtype="int32")
 		UFiT_input.fieldline_ptn = np.zeros((UFiT_input.numin_tot),dtype="int32")
 	if UFiT_input.save_Q:
@@ -320,9 +320,10 @@ def write_input_irregular(coord1,coord2,coord3,infile_name='ufit.inp'):
 	ufit_infile=open(infile_name,'wb')
 	ufit_infile.write(struct.pack('i',0))
 	ufit_infile.write(struct.pack('i',num_inp))
-	ufit_infile.write(coord1_arr[:num_inp].astype(UFiT_float_type))
-	ufit_infile.write(coord2_arr[:num_inp].astype(UFiT_float_type))
-	ufit_infile.write(coord3_arr[:num_inp].astype(UFiT_float_type))
+	for idx in range(num_inp):
+		ufit_infile.write(coord1_arr[idx].astype(UFiT_float_type))
+		ufit_infile.write(coord2_arr[idx].astype(UFiT_float_type))
+		ufit_infile.write(coord3_arr[idx].astype(UFiT_float_type))
 	ufit_infile.close()
 
 
