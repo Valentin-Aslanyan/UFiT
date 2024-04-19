@@ -63,8 +63,8 @@ for idx in range(np.shape(indices_actual)[0]):
 outfile.close()
 
 for idx in range(len(target_B_files)):
-	print(    "./Run_UFiT -dl 0.005 -ms 10000 -np 4 -pp -nb -sq -g 1 -b "+target_B_files[idx]+" -i ufit_emission.inp -o "+os.path.join(output_directory,"ufit_emission")+str(idx)+".flf")
-	os.system("./Run_UFiT -dl 0.005 -ms 10000 -np 4 -pp -nb -sq -g 1 -b "+target_B_files[idx]+" -i ufit_emission.inp -o "+os.path.join(output_directory,"ufit_emission")+str(idx)+".flf")
+	print(    "./Run_UFiT -dl 0.005 -ms 10000 -np 4 -pp -nb -sq -g 1 -b "+target_B_files[idx]+" -i ufit_emission.inp -o "+os.path.join(output_directory,"ufit_emission")+"{:03d}".format(idx)+".flf")
+	os.system("./Run_UFiT -dl 0.005 -ms 10000 -np 4 -pp -nb -sq -g 1 -b "+target_B_files[idx]+" -i ufit_emission.inp -o "+os.path.join(output_directory,"ufit_emission")+"{:03d}".format(idx)+".flf")
 
 
 

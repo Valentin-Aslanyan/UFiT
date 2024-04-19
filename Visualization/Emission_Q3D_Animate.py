@@ -36,6 +36,8 @@ fig=plt.figure("Emission",figsize=(16,16))
 
 call_result=call(["mkdir","./anim_temp"])
 
+max_Intensity=100.0*np.log(5000.0)/np.log(10.0)
+
 plot_idx=0
 for idx_f in range(len(Q_files)):
 
@@ -50,9 +52,11 @@ for idx_f in range(len(Q_files)):
 		Qfunc_full[indices[idx,0],indices[idx,1],indices[idx,2]]=np.log(np.clip(abs(UFiT_flf.Q_out[idx]),1.0,5000.0))/np.log(10.0)/np.exp(vr)
 
 	result=np.sum(Qfunc_full,axis=0)
+	if idx_f==0:
+		max_Intensity=max(result.flatten())
 
 	ax1=fig.gca()
-	plt.pcolormesh(vY,vZ,result.T,cmap="Greys_r",rasterized=True)
+	plt.pcolormesh(vY,vZ,result.T,cmap="Greys_r",rasterized=True,vmin=0.0,vmax=max_Intensity)
 	theta_c=np.linspace(0,2.0*np.pi,num=100)
 	ax1.fill(1.0*np.cos(theta_c),1.0*np.sin(theta_c),color="#000000")
 	ax1.set_xticks([])
