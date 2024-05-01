@@ -151,7 +151,7 @@ module UFiT_User_Functions
         call B_interp(idx_x, idx_y, idx_z, pos_next, B_out)
         B_squared_end2 = B_out(1)**2+B_out(2)**2+B_out(3)**2
 
-        fieldline_user(1,numin_tot) = B_squared_end1/B_squared_end2
+        fieldline_user(1,idx_t) = B_squared_end1/B_squared_end2
 
       end subroutine trace_cartesian_user
 
@@ -290,7 +290,7 @@ module UFiT_User_Functions
         call B_interp(idx_r, idx_th, idx_p, pos_next, B_out)
         B_squared_end2 = B_out(1)**2+B_out(2)**2+B_out(3)**2
 
-        fieldline_user(1,numin_tot) = B_squared_end1/B_squared_end2
+        fieldline_user(1,idx_t) = B_squared_end1/B_squared_end2
 
       end subroutine trace_spherical_user
 
