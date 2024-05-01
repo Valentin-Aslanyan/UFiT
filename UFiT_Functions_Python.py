@@ -20,6 +20,7 @@ class UFiT_flf_output:	#fieldline file, reading result of UFiT
 		self.save_Q = False
 		self.save_fieldlines = False
 		self.save_connection = False
+		self.user_defined = False
 		self.periodic_X = False
 		self.periodic_Y = False
 		self.periodic_Z = False
@@ -35,6 +36,8 @@ class UFiT_flf_output:	#fieldline file, reading result of UFiT
 		self.Q_out = np.zeros((2))
 		self.fieldlines = []
 		self.connection = np.zeros((2))
+		self.num_ud_variables = 1
+		self.fieldline_user = np.zeros((1,1),dtype="double")
 
 	def get_Q_2D(self,slice_dim=None,slice_index=None):
 		if self.save_Q==False:
@@ -142,7 +145,8 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.fieldline_ptn = np.zeros((1),dtype="int32")
 		self.Q_out = np.zeros((2),dtype="double")
 		self.fieldline_connection = np.zeros((2),dtype="b")
-		self.fieldline_user = np.zeros((1,2),dtype="double")
+		self.num_ud_variables=1
+		self.fieldline_user = np.zeros((1,1),dtype="double")
 
 
 def call_UFiT(shared_lib_path,UFiT_input):
@@ -405,6 +409,9 @@ def read_UFiT_output(UFiTfile_name='ufit.flf',print_header=False):
 			elif command_code.lower() == 'sc:':
 				if command_value[0].lower()=='t':
 					f_o.save_connection=True
+			elif command_code.lower() == 'ud:':
+				if command_value[0].lower()=='t':
+					f_o.user_defined=True
 			elif command_code.lower() == 'px:':
 				if command_value[0].lower()=='t':
 					f_o.periodic_X=True
@@ -447,6 +454,9 @@ def read_UFiT_output(UFiTfile_name='ufit.flf',print_header=False):
 			f_o.fieldlines.append(np.array(struct.unpack(f_o.fltname*3*num_fl[idx],ufit_file.read(f_o.fltsz*3*num_fl[idx]))).reshape(num_fl[idx],3))
 	if f_o.save_connection:
 		f_o.connection=np.array(struct.unpack('b'*f_o.numin_tot,ufit_file.read(f_o.numin_tot)))
+	if f_o.user_defined:
+		f_o.num_ud_variables=struct.unpack('i',ufit_file.read(4))[0]
+		f_o.endpoints=np.array(struct.unpack(f_o.fltname*f_o.num_ud_variables*f_o.numin_tot,ufit_file.read(f_o.fltsz*f_o.num_ud_variables*f_o.numin_tot))).reshape(f_o.numin_tot,f_o.num_ud_variables)
 	ufit_file.close()
 	return f_o
 
