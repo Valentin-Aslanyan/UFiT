@@ -456,7 +456,7 @@ def read_UFiT_output(UFiTfile_name='ufit.flf',print_header=False):
 		f_o.connection=np.array(struct.unpack('b'*f_o.numin_tot,ufit_file.read(f_o.numin_tot)))
 	if f_o.user_defined:
 		f_o.num_ud_variables=struct.unpack('i',ufit_file.read(4))[0]
-		f_o.endpoints=np.array(struct.unpack(f_o.fltname*f_o.num_ud_variables*f_o.numin_tot,ufit_file.read(f_o.fltsz*f_o.num_ud_variables*f_o.numin_tot))).reshape(f_o.numin_tot,f_o.num_ud_variables)
+		f_o.fieldline_user=np.array(struct.unpack(f_o.fltname*f_o.num_ud_variables*f_o.numin_tot,ufit_file.read(f_o.fltsz*f_o.num_ud_variables*f_o.numin_tot))).reshape(f_o.numin_tot,f_o.num_ud_variables)
 	ufit_file.close()
 	return f_o
 
