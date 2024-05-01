@@ -25,7 +25,7 @@ idxfile.close()
 
 Qfunc_full=np.zeros((len_vX,len_vY,len_vZ))
 
-UFiT_flf=read_UFiT_output(UFiTfile_name='ufit_emission0.flf')
+UFiT_flf=read_UFiT_output(UFiTfile_name='ufit_emission000.flf')
 
 for idx in range(len_indices):
 	vr=np.sqrt(vX[indices[idx,0]]**2+vY[indices[idx,1]]**2+vZ[indices[idx,2]]**2)

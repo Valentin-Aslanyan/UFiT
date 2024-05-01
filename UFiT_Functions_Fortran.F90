@@ -1379,6 +1379,8 @@ module UFiT_Functions_Fortran
         header_start = trim(header_start) // ' SF:' // trim(string_temp) // ';'
         write(string_temp, *) save_connection
         header_start = trim(header_start) // ' SC:' // trim(string_temp) // ';'
+        write(string_temp, *) user_defined
+        header_start = trim(header_start) // ' UD:' // trim(string_temp) // ';'
         write(string_temp, *) periodic_X
         header_start = trim(header_start) // ' PX:' // trim(string_temp) // ';'
         write(string_temp, *) periodic_Y
@@ -1431,6 +1433,13 @@ module UFiT_Functions_Fortran
         if (save_connection) then
           do idx = 1, numin_tot
             write(out_unit) fieldline_connection(idx)
+          end do
+        end if
+      !User defined
+        if (user_defined) then
+          write(out_unit) num_ud_variables
+          do idx = 1, numin_tot
+            write(out_unit) fieldline_user(:,idx)
           end do
         end if
 
@@ -4448,6 +4457,7 @@ module UFiT_Functions_Fortran
         INTEGER :: step_num, idx_r, idx_th, idx_p, step_start, step_total
         LOGICAL :: keep_running
         REAL(num) :: pos_out(3), B_out(3), mod_Bout, last_stepsize, u_0(3), v_0(3)
+        REAL(num) :: pos_next(3), pos_curr(3)
 
         pos_fieldline(:,MAX_STEPS+1,idx_t) = pos_start(:)
         idx_r = 1
@@ -4455,53 +4465,56 @@ module UFiT_Functions_Fortran
         idx_p = 1
 
       !Backwards integration
+        pos_next(:) = pos_start(:)
         step_num = 1
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_r, idx_th, idx_p, pos_fieldline(:,MAX_STEPS+2-step_num,idx_t), &
-                               pos_fieldline(:,MAX_STEPS+1-step_num,idx_t), u_0, v_0, &
-                               -dl, keep_running, check_position,B_interp, B_gradB_interp)
+          pos_curr(:) = pos_next(:)
+          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, -dl, &
+                               keep_running, check_position,B_interp, B_gradB_interp)
+          pos_fieldline(:,MAX_STEPS+1-step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
         end do
         step_start = MAX_STEPS - step_num + 2
         pos_step_start(idx_t) = step_start
         if (.not. keep_running) then
-          call check_position(pos_fieldline(:,step_start+1,idx_t),pos_out,keep_running)
+          call check_position(pos_curr(:),pos_out,keep_running)
           call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
-          call intercept_boundary(pos_fieldline(:,step_start+1,idx_t),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_fieldline(:,step_start+1,idx_t), &
-                               pos_fieldline(:,step_start,idx_t), u_0, v_0, &
-                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
-                               B_interp, B_gradB_interp)
+          call intercept_boundary(pos_curr(:),B_out,last_stepsize)
+          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
+                              -last_stepsize*dl*0.9999_num, keep_running, check_position, &
+                              B_interp, B_gradB_interp)
+          pos_fieldline(:,step_start,idx_t) = pos_next(:)
         end if
-        pos_endpoints(1:3,idx_t) = pos_fieldline(:,step_start,idx_t)
+        pos_endpoints(1:3,idx_t) = pos_next(:)
 
       !Forwards integration
+        pos_next(:) = pos_start(:)
         step_num = 1
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_r, idx_th, idx_p, pos_fieldline(:,MAX_STEPS+step_num,idx_t), &
-                               pos_fieldline(:,MAX_STEPS+1+step_num,idx_t), u_0, v_0, &
+          pos_curr(:) = pos_next(:)
+          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
                                dl, keep_running, check_position,B_interp, B_gradB_interp)
+          pos_fieldline(:,MAX_STEPS+1+step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
         end do
         step_total = MAX_STEPS + step_num - step_start + 1
         pos_step_total(idx_t) = step_total
         if (.not. keep_running) then
-          call check_position(pos_fieldline(:,step_total+step_start-2,idx_t),pos_out,keep_running)
+          call check_position(pos_curr(:),pos_out,keep_running)
           call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
-          call intercept_boundary(pos_fieldline(:,step_total+step_start-2,idx_t),B_out, &
-                                  last_stepsize)
-          call single_step(idx_r,idx_th,idx_p,pos_fieldline(:,step_total+step_start-2,idx_t), &
-                               pos_fieldline(:,step_total+step_start-1,idx_t), u_0, v_0, &
+          call intercept_boundary(pos_curr(:),B_out,last_stepsize)
+          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
+          pos_fieldline(:,step_total+step_start-1,idx_t) = pos_next(:)
         end if
-        pos_endpoints(4:6,idx_t) = pos_fieldline(:,step_total+step_start-1,idx_t)
+        pos_endpoints(4:6,idx_t) = pos_next(:)
 
         if (save_connection) then
           if ((pos_endpoints(1,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
@@ -4682,8 +4695,8 @@ module UFiT_Functions_Fortran
         end if
         !mod-B normalization
         pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
-                       vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
-                       *vecdot(u_downt,v_downt))*Q_sign*mod_Bup*mod_Bdown/(mod_B0**2)
+                        vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt) &
+                        *vecdot(u_downt,v_downt))*Q_sign*mod_Bup*mod_Bdown/(mod_B0**2)
         !determinant normalization
         !pos_Q(idx_t) = (vecdot(u_upt,u_upt)*vecdot(v_downt,v_downt)+vecdot(v_upt,v_upt)* &
         !               vecdot(u_downt,u_downt)-2.0_num*vecdot(u_upt,v_upt)* &
@@ -4793,7 +4806,7 @@ module UFiT_Functions_Fortran
         REAL(num) :: B_0(3), u_0(3), v_0(3), pos_out(3), B_out(3), mod_Bout, last_stepsize
         REAL(num) :: B_up(3), u_up(3), v_up(3), u_upt(3), v_upt(3)
         REAL(num) :: B_down(3), u_down(3), v_down(3), u_downt(3), v_downt(3)
-        REAL(num) :: mod_B0, mod_Bup, mod_Bdown, Q_sign
+        REAL(num) :: mod_B0, mod_Bup, mod_Bdown, Q_sign, pos_next(3), pos_curr(3)
 
         pos_fieldline(:,MAX_STEPS+1,idx_t) = pos_start(:)
         idx_r = 1
@@ -4805,30 +4818,32 @@ module UFiT_Functions_Fortran
         call create_perpendicular_vectors(B_0,u_0,v_0)
 
       !Backwards integration
+        pos_next(:) = pos_start(:)
         step_num = 1
         keep_running = .true.
         u_down(:) = u_0(:)
         v_down(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_r, idx_th, idx_p, pos_fieldline(:,MAX_STEPS+2-step_num,idx_t), &
-                               pos_fieldline(:,MAX_STEPS+1-step_num,idx_t), u_down, v_down,  &
+          pos_curr(:) = pos_next(:)
+          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_down, v_down, &
                                -dl, keep_running, check_position,B_interp,B_gradB_interp)
+          pos_fieldline(:,MAX_STEPS+1-step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
         end do
         step_start = MAX_STEPS - step_num + 2
         pos_step_start(idx_t) = step_start
         if (.not. keep_running) then
-          call check_position(pos_fieldline(:,step_start+1,idx_t),pos_out,keep_running)
+          call check_position(pos_curr(:),pos_out,keep_running)
           call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
-          call intercept_boundary(pos_fieldline(:,step_start+1,idx_t),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_fieldline(:,step_start+1,idx_t), &
-                               pos_fieldline(:,step_start,idx_t), u_down, v_down,  &
+          call intercept_boundary(pos_curr(:),B_out,last_stepsize)
+          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_down, v_down, &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
+          pos_fieldline(:,step_start,idx_t) = pos_next(:)
         end if
-        pos_endpoints(1:3,idx_t) = pos_fieldline(:,step_start,idx_t)
+        pos_endpoints(1:3,idx_t) = pos_next(:)
         call check_position(pos_endpoints(1:3,idx_t),pos_out,keep_running)
         call B_interp(idx_r, idx_th, idx_p, pos_out, B_down)
         mod_Bdown = SQRT(B_down(1)**2+B_down(2)**2+B_down(3)**2)
@@ -4836,31 +4851,33 @@ module UFiT_Functions_Fortran
         v_downt(:) = v_down(:) - B_down(:)*vecdot(v_down,B_down)/(mod_Bdown**2)
 
       !Forwards integration
+        pos_next(:) = pos_start(:)
         step_num = 1
         keep_running = .true.
         u_up(:) = u_0(:)
         v_up(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_r, idx_th, idx_p, pos_fieldline(:,MAX_STEPS+step_num,idx_t), &
-                               pos_fieldline(:,MAX_STEPS+1+step_num,idx_t), u_up, v_up,   &
-                               dl, keep_running, check_position, B_interp,B_gradB_interp)
+          pos_curr(:) = pos_next(:)
+          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_up, v_up, &
+                               dl, keep_running, check_position,B_interp,B_gradB_interp)
+          pos_fieldline(:,MAX_STEPS+1+step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
         end do
         step_total = MAX_STEPS + step_num - step_start + 1
         pos_step_total(idx_t) = step_total
         if (.not. keep_running) then
-          call check_position(pos_fieldline(:,step_total+step_start-2,idx_t),pos_out,keep_running)
+          call check_position(pos_curr(:),pos_out,keep_running)
           call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
-          call intercept_boundary(pos_fieldline(:,step_total+step_start-2,idx_t),B_out, &
+          call intercept_boundary(pos_curr(:),B_out, &
                                   last_stepsize)
-          call single_step(idx_r,idx_th,idx_p,pos_fieldline(:,step_total+step_start-2,idx_t), &
-                               pos_fieldline(:,step_total+step_start-1,idx_t), u_down, v_down,  &
+          call single_step(idx_r, idx_th,idx_p,pos_curr(:), pos_next(:), u_up, v_up, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
+          pos_fieldline(:,step_total+step_start-1,idx_t) = pos_next(:)
         end if
-        pos_endpoints(4:6,idx_t) = pos_fieldline(:,step_total+step_start-1,idx_t)
+        pos_endpoints(4:6,idx_t) = pos_next(:)
         call check_position(pos_endpoints(4:6,idx_t),pos_out,keep_running)
         call B_interp(idx_r, idx_th, idx_p, pos_out, B_up)
         mod_Bup = SQRT(B_up(1)**2+B_up(2)**2+B_up(3)**2)
@@ -5070,6 +5087,13 @@ module UFiT_Functions_Fortran
         procedure (B_gradB_interp), pointer :: bgradinterp_ptr => null ()
         procedure (single_step), pointer :: step_ptr => null ()
         procedure (trace_fl), pointer :: tr_ptr => null ()
+
+        if (user_defined) then
+          save_endpoints = .false.
+          save_Q = .false.
+          save_connection = .false.
+          save_fieldlines = .false.
+        end if
 
         if ((.not. save_endpoints) .and. (.not. save_Q) .and. (.not. save_connection) .and. &
             (.not. save_fieldlines) .and. (.not. user_defined)) then

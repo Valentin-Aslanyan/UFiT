@@ -11,7 +11,8 @@ module UFiT_User_Functions
       subroutine prepare_user_defined
       !Will be executed if running in user mode
 
-        ALLOCATE(fieldline_user(1,numin_tot))
+        num_ud_variables = 1
+        ALLOCATE(fieldline_user(num_ud_variables,numin_tot))
 
       end subroutine prepare_user_defined
 

@@ -2,10 +2,10 @@
 
 output_directory="./"
 
-frames_per_step=10
-frames_per_sec=20
-pad_start_frames=6
-pad_end_frames=6
+frames_per_step=15
+frames_per_sec=60
+pad_start_frames=0
+pad_end_frames=0
 
 
 import sys

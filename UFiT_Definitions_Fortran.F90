@@ -49,6 +49,7 @@ module UFiT_Definitions_Fortran
       !Fieldlines are considered closed if both endpoints are within this constant *size(Z) of Z_min or *size(R) of R_min respectively
       REAL(num) :: closed_fl_constant=0.1_num
       REAL(num) :: closed_fl_size
+      INTEGER :: num_ud_variables
 
 
 end module UFiT_Definitions_Fortran
