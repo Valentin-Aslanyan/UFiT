@@ -2673,6 +2673,57 @@ module UFiT_Functions_Fortran
       end subroutine B_interp_regular
 
 
+      subroutine B_interp_normalized_regular(idx1, idx2, idx3, pos_in, B_out)
+      !Trilinear interpolation of B at a coordinate surrounded by grid cells
+      !First normalize B at each vertex
+      !First transform to a cell of size [0,1]
+      !delta1,2,3 are cell sizes
+      !shift1,2,3 are the coordinates transformed to [0,1]
+
+        INTEGER :: idx1, idx2, idx3
+        REAL(num), INTENT(IN) :: pos_in(3)
+        REAL(num), INTENT(OUT) :: B_out(3)
+
+        INTEGER :: idx1p, idx2p, idx3p
+        REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
+        REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
+        REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
+
+        idx1 = find_index(grid1,sz_1,pos_in(1),idx1)
+        idx2 = find_index(grid2,sz_2,pos_in(2),idx2)
+        idx3 = find_index(grid3,sz_3,pos_in(3),idx3)
+        idx1p = idx1+1
+        idx2p = idx2+1
+        idx3p = idx3+1
+        B000(:) = normalize_vector(B_grid(:,idx1,idx2,idx3))
+        B001(:) = normalize_vector(B_grid(:,idx1,idx2,idx3p))
+        B010(:) = normalize_vector(B_grid(:,idx1,idx2p,idx3))
+        B011(:) = normalize_vector(B_grid(:,idx1,idx2p,idx3p))
+        B100(:) = normalize_vector(B_grid(:,idx1p,idx2,idx3))
+        B101(:) = normalize_vector(B_grid(:,idx1p,idx2,idx3p))
+        B110(:) = normalize_vector(B_grid(:,idx1p,idx2p,idx3))
+        B111(:) = normalize_vector(B_grid(:,idx1p,idx2p,idx3p))
+
+        delta1 = grid1(idx1p) - grid1(idx1)
+        delta2 = grid2(idx2p) - grid2(idx2)
+        delta3 = grid3(idx3p) - grid3(idx3)
+        shift1 = (pos_in(1) - grid1(idx1))/delta1
+        shift2 = (pos_in(2) - grid2(idx2))/delta2
+        shift3 = (pos_in(3) - grid3(idx3))/delta3
+        a1(:) = B100(:)-B000(:)
+        a2(:) = B010(:)-B000(:)
+        a3(:) = B001(:)-B000(:)
+        a4(:) = B110(:)-B100(:)-B010(:)+B000(:)
+        a5(:) = B101(:)-B100(:)-B001(:)+B000(:)
+        a6(:) = B011(:)-B001(:)-B010(:)+B000(:)
+        a7(:) = B111(:)-B110(:)-B101(:)-B011(:)+B001(:)+B010(:)+B100(:)-B000(:)
+
+        B_out(:) = B000(:) + a1(:)*shift1 + a2(:)*shift2 + a3(:)*shift3 + a4(:)*shift1*shift2 &
+               + a5(:)*shift1*shift3 + a6(:)*shift2*shift3 + a7(:)*shift1*shift2*shift3
+
+      end subroutine B_interp_normalized_regular
+
+
       subroutine B_interp_irregular(idx_b, idx_dummy1, idx_dummy2, pos_in, B_out)
       !Trilinear interpolation of B at a coordinate surrounded by grid cells
       !First transform to a cell of size [0,1]
@@ -2750,6 +2801,86 @@ module UFiT_Functions_Fortran
                + a5(:)*shift1*shift3 + a6(:)*shift2*shift3 + a7(:)*shift1*shift2*shift3
 
       end subroutine B_interp_irregular
+
+
+      subroutine B_interp_normalized_irregular(idx_b, idx_dummy1, idx_dummy2, pos_in, B_out)
+      !Trilinear interpolation of B at a coordinate surrounded by grid cells
+      !First normalize B at each vertex
+      !First transform to a cell of size [0,1]
+      !delta1,2,3 are cell sizes
+      !shift1,2,3 are the coordinates transformed to [0,1]
+
+        INTEGER :: idx_b, idx_dummy1, idx_dummy2
+        REAL(num), INTENT(IN) :: pos_in(3)
+        REAL(num), INTENT(OUT) :: B_out(3)
+
+        INTEGER :: idx1m, idx2m, idx3m, idx1, idx2, idx3, idx1p, idx2p, idx3p
+        REAL(num) :: coord1l, coord1r, coord2l, coord2r, coord3l, coord3r
+        REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
+        REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
+        REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
+
+        idx_b = find_index_irregular(pos_in,idx_b)
+        idx1m = FLOOR((pos_in(1)-grid1_ir(1,idx_b))/(grid1_ir(2,idx_b)-grid1_ir(1,idx_b)) &
+                     *REAL(sz_1-1,num))
+        if (idx1m .ge. (sz_1-1)) then
+          idx1m = sz_1 - 2
+        end if
+        idx2m = FLOOR((pos_in(2)-grid2_ir(1,idx_b))/(grid2_ir(2,idx_b)-grid2_ir(1,idx_b)) &
+                     *REAL(sz_2-1,num))
+        if (idx2m .ge. (sz_2-1)) then
+          idx2m = sz_2 - 2
+        end if
+        idx3m = FLOOR((pos_in(3)-grid3_ir(1,idx_b))/(grid3_ir(2,idx_b)-grid3_ir(1,idx_b)) &
+                     *REAL(sz_3-1,num))
+        if (idx3m .ge. (sz_3-1)) then
+          idx3m = sz_3 - 2
+        end if
+        idx1 = idx1m+1
+        idx2 = idx2m+1
+        idx3 = idx3m+1
+        idx1p = idx1m+2
+        idx2p = idx2m+2
+        idx3p = idx3m+2
+        B000(:) = normalize_vector(B_grid_ir(:,idx1,idx2,idx3,idx_b))
+        B001(:) = normalize_vector(B_grid_ir(:,idx1,idx2,idx3p,idx_b))
+        B010(:) = normalize_vector(B_grid_ir(:,idx1,idx2p,idx3,idx_b))
+        B011(:) = normalize_vector(B_grid_ir(:,idx1,idx2p,idx3p,idx_b))
+        B100(:) = normalize_vector(B_grid_ir(:,idx1p,idx2,idx3,idx_b))
+        B101(:) = normalize_vector(B_grid_ir(:,idx1p,idx2,idx3p,idx_b))
+        B110(:) = normalize_vector(B_grid_ir(:,idx1p,idx2p,idx3,idx_b))
+        B111(:) = normalize_vector(B_grid_ir(:,idx1p,idx2p,idx3p,idx_b))
+
+        coord1l = REAL(idx1m,num)/REAL(sz_1-1,num)*(grid1_ir(2,idx_b)-grid1_ir(1,idx_b)) &
+                  +grid1_ir(1,idx_b)
+        coord1r = REAL(idx1,num)/REAL(sz_1-1,num)*(grid1_ir(2,idx_b)-grid1_ir(1,idx_b)) &
+                  +grid1_ir(1,idx_b)
+        coord2l = REAL(idx2m,num)/REAL(sz_2-1,num)*(grid2_ir(2,idx_b)-grid2_ir(1,idx_b)) &
+                  +grid2_ir(1,idx_b)
+        coord2r = REAL(idx2,num)/REAL(sz_2-1,num)*(grid2_ir(2,idx_b)-grid2_ir(1,idx_b)) &
+                  +grid2_ir(1,idx_b)
+        coord3l = REAL(idx3m,num)/REAL(sz_3-1,num)*(grid3_ir(2,idx_b)-grid3_ir(1,idx_b)) &
+                  +grid3_ir(1,idx_b)
+        coord3r = REAL(idx3,num)/REAL(sz_3-1,num)*(grid3_ir(2,idx_b)-grid3_ir(1,idx_b)) &
+                  +grid3_ir(1,idx_b)
+        delta1 = coord1r - coord1l
+        delta2 = coord2r - coord2l
+        delta3 = coord3r - coord3l
+        shift1 = (pos_in(1) - coord1l)/delta1
+        shift2 = (pos_in(2) - coord2l)/delta2
+        shift3 = (pos_in(3) - coord3l)/delta3
+        a1(:) = B100(:)-B000(:)
+        a2(:) = B010(:)-B000(:)
+        a3(:) = B001(:)-B000(:)
+        a4(:) = B110(:)-B100(:)-B010(:)+B000(:)
+        a5(:) = B101(:)-B100(:)-B001(:)+B000(:)
+        a6(:) = B011(:)-B001(:)-B010(:)+B000(:)
+        a7(:) = B111(:)-B110(:)-B101(:)-B011(:)+B001(:)+B010(:)+B100(:)-B000(:)
+
+        B_out(:) = B000(:) + a1(:)*shift1 + a2(:)*shift2 + a3(:)*shift3 + a4(:)*shift1*shift2 &
+               + a5(:)*shift1*shift3 + a6(:)*shift2*shift3 + a7(:)*shift1*shift2*shift3
+
+      end subroutine B_interp_normalized_irregular
 
 
       subroutine B_gradB_interp_regular(idx1, idx2, idx3, pos_in, B_out, gradB_out)
@@ -4034,15 +4165,16 @@ module UFiT_Functions_Fortran
           end subroutine B_gradB_interp
         end interface
 
-        REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm
+        REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm, r_sin_th
 
         call check_position(pos_in,pos_0out,keep_running)
         call B_interp(idx_r, idx_t, idx_p, pos_0out, B_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_0out(1)*SIN(pos_0out(2))
         k_1(1) = B_curr(1)*dl_norm
         k_1(2) = B_curr(2)*dl_norm/pos_0out(1)
-        k_1(3) = B_curr(3)*dl_norm/pos_0out(1)/SIN(pos_0out(2))
+        k_1(3) = B_curr(3)*dl_norm/r_sin_th
 
         pos_out(:) = pos_in(:) + k_1(:)
         call check_position(pos_out,pos_0out,keep_running)
@@ -5123,13 +5255,13 @@ module UFiT_Functions_Fortran
         end if
 
         if ((grid_regular) .and. (normalized_B)) then
-          binterp_ptr => B_interp_regular
+          binterp_ptr => B_interp_normalized_regular
           bgradinterp_ptr => B_gradB_interp_normalized_regular
         else if ((grid_regular) .and. (.not. normalized_B)) then
           binterp_ptr => B_interp_regular
           bgradinterp_ptr => B_gradB_interp_regular
         else if ((.not. grid_regular) .and. (normalized_B)) then
-          binterp_ptr => B_interp_irregular
+          binterp_ptr => B_interp_normalized_irregular
           bgradinterp_ptr => B_gradB_interp_normalized_irregular
         else
           binterp_ptr => B_interp_irregular
