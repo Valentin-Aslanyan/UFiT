@@ -65,7 +65,7 @@ module UFiT_Functions_Fortran
 
         num_args = iargc()
 
-        if (num_args .eq. 0) then
+        if (num_args .le. 0) then
           read_command_file = .true.
         else
           idx = 1
