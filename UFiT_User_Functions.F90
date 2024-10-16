@@ -295,5 +295,13 @@ module UFiT_User_Functions
       end subroutine trace_spherical_user
 
 
+      subroutine cleanup_user_defined
+      !Will be executed at the end; use this to deallocate, or do any other housekeeping on exit
+
+        IF (ALLOCATED(fieldline_user)) DEALLOCATE(fieldline_user)
+
+      end subroutine cleanup_user_defined
+
+
 end module UFiT_User_Functions
 

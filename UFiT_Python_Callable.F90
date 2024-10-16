@@ -223,7 +223,9 @@ subroutine UFiT_Python_Callable(IN_geometry, &
       IF (ALLOCATED(fieldline_ptn)) DEALLOCATE(fieldline_ptn)
       IF (ALLOCATED(fieldline_Q)) DEALLOCATE(fieldline_Q)
       IF (ALLOCATED(fieldline_connection)) DEALLOCATE(fieldline_connection)
-      IF (ALLOCATED(fieldline_user)) DEALLOCATE(fieldline_user)
+      if (user_defined) then
+        call cleanup_user_defined
+      end if
 
       contains
 

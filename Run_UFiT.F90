@@ -15,6 +15,7 @@ program Run_UFiT
       call get_available_resource
       call run_trace
       call write_output
+      call cleanup
 
 end program Run_UFiT
 
