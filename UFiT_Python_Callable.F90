@@ -206,26 +206,7 @@ subroutine UFiT_Python_Callable(IN_geometry, &
         end if
       end if
 
-      IF (ALLOCATED(coord1_in)) DEALLOCATE(coord1_in)
-      IF (ALLOCATED(coord2_in)) DEALLOCATE(coord2_in)
-      IF (ALLOCATED(coord3_in)) DEALLOCATE(coord3_in)
-      IF (ALLOCATED(grid1)) DEALLOCATE(grid1)
-      IF (ALLOCATED(grid2)) DEALLOCATE(grid2)
-      IF (ALLOCATED(grid3)) DEALLOCATE(grid3)
-      IF (ALLOCATED(B_grid)) DEALLOCATE(B_grid)
-      IF (ALLOCATED(grid1_ir)) DEALLOCATE(grid1_ir)
-      IF (ALLOCATED(grid2_ir)) DEALLOCATE(grid2_ir)
-      IF (ALLOCATED(grid3_ir)) DEALLOCATE(grid3_ir)
-      IF (ALLOCATED(B_grid_ir)) DEALLOCATE(B_grid_ir)
-      IF (ALLOCATED(fieldline_endpoints)) DEALLOCATE(fieldline_endpoints)
-      IF (ALLOCATED(fieldline_allpos)) DEALLOCATE(fieldline_allpos)
-      IF (ALLOCATED(fieldline_pts)) DEALLOCATE(fieldline_pts)
-      IF (ALLOCATED(fieldline_ptn)) DEALLOCATE(fieldline_ptn)
-      IF (ALLOCATED(fieldline_Q)) DEALLOCATE(fieldline_Q)
-      IF (ALLOCATED(fieldline_connection)) DEALLOCATE(fieldline_connection)
-      if (user_defined) then
-        call cleanup_user_defined
-      end if
+      call cleanup
 
       contains
 

@@ -23,6 +23,7 @@ module UFiT_Definitions_Fortran
       CHARACTER(len=str_mx) :: in_filename
       CHARACTER(len=str_mx) :: out_filename
       LOGICAL :: grid_regular
+      LOGICAL :: grid_separate
       !Following are seeds of fieldlines
       REAL(num), DIMENSION(:), ALLOCATABLE :: coord1_in  !X for Cartesian, r for spherical
       REAL(num), DIMENSION(:), ALLOCATABLE :: coord2_in  !Y for Cartesian, theta for spherical
@@ -33,6 +34,20 @@ module UFiT_Definitions_Fortran
       REAL(num), DIMENSION(:), ALLOCATABLE :: grid2      !Y for Cartesian, theta for spherical
       REAL(num), DIMENSION(:), ALLOCATABLE :: grid3      !Z for Cartesian, phi for spherical
       REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: B_grid
+      !Regular coordinate grids, staggered (independent grids for each B component)
+      INTEGER :: sz_11, sz_12, sz_13, sz_21, sz_22, sz_23, sz_31, sz_32, sz_33
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid1_1      !X/r coordinates for B_X/B_r
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid1_2      !Y/theta coordinates for B_X/B_r
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid1_3      !Z/phi coordinates for B_X/B_r
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid2_1      !X/r coordinates for B_Y/B_theta
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid2_2      !Y/theta coordinates for B_Y/B_theta
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid2_3      !Z/phi coordinates for B_Y/B_theta
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid3_1      !X/r coordinates for B_Z/B_phi
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid3_2      !Y/theta coordinates for B_Z/B_phi
+      REAL(num), DIMENSION(:), ALLOCATABLE :: grid3_3      !Z/phi coordinates for B_Z/B_phi
+      REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: B_grid1  !B_X/B_r
+      REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: B_grid2  !B_Y/B_theta
+      REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: B_grid3  !B_Z/B_phi
       !Irregular coordinate grid (e.g. ARMS blocks)
       REAL(num), DIMENSION(:,:), ALLOCATABLE :: grid1_ir      !X for Cartesian, r for spherical
       REAL(num), DIMENSION(:,:), ALLOCATABLE :: grid2_ir      !Y for Cartesian, theta for spherical

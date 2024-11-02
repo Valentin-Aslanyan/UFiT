@@ -34,6 +34,7 @@ module UFiT_Functions_Fortran
         Bfile_type = -1
         input_type = 0
         grid_regular = .true.
+        grid_separate = .false.
         periodic_X = .false.
         periodic_Y = .false.
         periodic_Z = .false.
@@ -92,6 +93,9 @@ module UFiT_Functions_Fortran
 
               case ('-pp', '--periodic_phi', '--periodic_PHI')
                 periodic_PHI = .true.
+
+              case ('-gs', '--grid_staggered', '--grid_separate')
+                grid_separate = .true.
 
               case ('-r', '--resources')
                 print_devices = .true.
@@ -236,6 +240,12 @@ module UFiT_Functions_Fortran
                   read(arg2,*,iostat=stat2) periodic_PHI
                   if (stat2 .ne. 0) then
                     print *, 'unrecognised periodic PHI option: ', TRIM(arg2)
+                  end if
+
+                case ('GS:')
+                  read(arg2,*,iostat=stat2) grid_separate
+                  if (stat2 .ne. 0) then
+                    print *, 'unrecognised grid separate/staggered option: ', TRIM(arg2)
                   end if
 
                 case ('R:')
@@ -1389,6 +1399,8 @@ module UFiT_Functions_Fortran
         header_start = trim(header_start) // ' PZ:' // trim(string_temp) // ';'
         write(string_temp, *) periodic_PHI
         header_start = trim(header_start) // ' PP:' // trim(string_temp) // ';'
+        write(string_temp, *) grid_separate
+        header_start = trim(header_start) // ' GS:' // trim(string_temp) // ';'
 
         open(newunit=out_unit, file=out_filename ,access = 'stream', status = 'replace')
         write(out_unit) header_start
@@ -2623,24 +2635,31 @@ module UFiT_Functions_Fortran
       end subroutine create_perpendicular_vectors
 
 
-      subroutine B_interp_regular(idx1, idx2, idx3, pos_in, B_out)
+      subroutine B_interp_regular(idx_in, pos_in, B_out)
       !Trilinear interpolation of B at a coordinate surrounded by grid cells
       !First transform to a cell of size [0,1]
       !delta1,2,3 are cell sizes
       !shift1,2,3 are the coordinates transformed to [0,1]
 
-        INTEGER :: idx1, idx2, idx3
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
 
+        INTEGER :: idx1, idx2, idx3
         INTEGER :: idx1p, idx2p, idx3p
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx1 = idx_in(1)
+        idx2 = idx_in(2)
+        idx3 = idx_in(3)
         idx1 = find_index(grid1,sz_1,pos_in(1),idx1)
         idx2 = find_index(grid2,sz_2,pos_in(2),idx2)
         idx3 = find_index(grid3,sz_3,pos_in(3),idx3)
+        idx_in(1) = idx1
+        idx_in(2) = idx2
+        idx_in(3) = idx3
         idx1p = idx1+1
         idx2p = idx2+1
         idx3p = idx3+1
@@ -2673,25 +2692,109 @@ module UFiT_Functions_Fortran
       end subroutine B_interp_regular
 
 
-      subroutine B_interp_normalized_regular(idx1, idx2, idx3, pos_in, B_out)
+      subroutine interp_single_regular(idx1, idx2, idx3, sz_1, sz_2, sz_3, grid1, grid2, grid3, &
+                                        array_in, pos_in, value_out)
+      !Trilinear interpolation of a single variable at a coordinate surrounded by grid cells
+      !First transform to a cell of size [0,1]
+      !delta1,2,3 are cell sizes
+      !shift1,2,3 are the coordinates transformed to [0,1]
+
+        INTEGER :: idx1, idx2, idx3
+        INTEGER :: sz_1, sz_2, sz_3
+        REAL(num), DIMENSION(:), ALLOCATABLE :: grid1
+        REAL(num), DIMENSION(:), ALLOCATABLE :: grid2
+        REAL(num), DIMENSION(:), ALLOCATABLE :: grid3
+        REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: array_in
+        REAL(num), INTENT(IN) :: pos_in(3)
+        REAL(num), INTENT(OUT) :: value_out
+
+        INTEGER :: idx1p, idx2p, idx3p
+        REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
+        REAL(num) :: a1, a2, a3, a4, a5, a6, a7
+        REAL(num) :: arr000, arr001, arr010, arr011, arr100, arr101, arr110, arr111
+
+        idx1 = find_index(grid1,sz_1,pos_in(1),idx1)
+        idx2 = find_index(grid2,sz_2,pos_in(2),idx2)
+        idx3 = find_index(grid3,sz_3,pos_in(3),idx3)
+        idx1p = idx1+1
+        idx2p = idx2+1
+        idx3p = idx3+1
+        arr000 = array_in(idx1,idx2,idx3)
+        arr001 = array_in(idx1,idx2,idx3p)
+        arr010 = array_in(idx1,idx2p,idx3)
+        arr011 = array_in(idx1,idx2p,idx3p)
+        arr100 = array_in(idx1p,idx2,idx3)
+        arr101 = array_in(idx1p,idx2,idx3p)
+        arr110 = array_in(idx1p,idx2p,idx3)
+        arr111 = array_in(idx1p,idx2p,idx3p)
+
+        delta1 = grid1(idx1p) - grid1(idx1)
+        delta2 = grid2(idx2p) - grid2(idx2)
+        delta3 = grid3(idx3p) - grid3(idx3)
+        shift1 = (pos_in(1) - grid1(idx1))/delta1
+        shift2 = (pos_in(2) - grid2(idx2))/delta2
+        shift3 = (pos_in(3) - grid3(idx3))/delta3
+        a1 = arr100-arr000
+        a2 = arr010-arr000
+        a3 = arr001-arr000
+        a4 = arr110-arr100-arr010+arr000
+        a5 = arr101-arr100-arr001+arr000
+        a6 = arr011-arr001-arr010+arr000
+        a7 = arr111-arr110-arr101-arr011+arr001+arr010+arr100-arr000
+
+        value_out = arr000 + a1*shift1 + a2*shift2 + a3*shift3 + a4*shift1*shift2 &
+               + a5*shift1*shift3 + a6*shift2*shift3 + a7*shift1*shift2*shift3
+
+      end subroutine interp_single_regular
+
+
+      subroutine B_interp_regular_separate(idx_in, pos_in, B_out)
+      !Trilinear interpolation of B at a coordinate surrounded by grid cells
+      !Each component of B has a separate array (e.g. staggered grid)
+      !First transform to a cell of size [0,1]
+      !delta1,2,3 are cell sizes
+      !shift1,2,3 are the coordinates transformed to [0,1]
+
+        INTEGER :: idx_in(9)
+        REAL(num), INTENT(IN) :: pos_in(3)
+        REAL(num), INTENT(OUT) :: B_out(3)
+
+        call interp_single_regular(idx_in(1), idx_in(2), idx_in(3), sz_11, sz_12, sz_13, grid1_1, &
+                                        grid1_2, grid1_3, B_grid1, pos_in, B_out(1))
+        call interp_single_regular(idx_in(4), idx_in(5), idx_in(6), sz_21, sz_22, sz_23, grid2_1, &
+                                        grid2_2, grid2_3, B_grid2, pos_in, B_out(2))
+        call interp_single_regular(idx_in(7), idx_in(8), idx_in(9), sz_31, sz_32, sz_33, grid3_1, &
+                                        grid3_2, grid3_3, B_grid3, pos_in, B_out(3))
+
+      end subroutine B_interp_regular_separate
+
+
+      subroutine B_interp_normalized_regular(idx_in, pos_in, B_out)
       !Trilinear interpolation of B at a coordinate surrounded by grid cells
       !First normalize B at each vertex
       !First transform to a cell of size [0,1]
       !delta1,2,3 are cell sizes
       !shift1,2,3 are the coordinates transformed to [0,1]
 
-        INTEGER :: idx1, idx2, idx3
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
 
+        INTEGER :: idx1, idx2, idx3
         INTEGER :: idx1p, idx2p, idx3p
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx1 = idx_in(1)
+        idx2 = idx_in(2)
+        idx3 = idx_in(3)
         idx1 = find_index(grid1,sz_1,pos_in(1),idx1)
         idx2 = find_index(grid2,sz_2,pos_in(2),idx2)
         idx3 = find_index(grid3,sz_3,pos_in(3),idx3)
+        idx_in(1) = idx1
+        idx_in(2) = idx2
+        idx_in(3) = idx3
         idx1p = idx1+1
         idx2p = idx2+1
         idx3p = idx3+1
@@ -2724,23 +2827,26 @@ module UFiT_Functions_Fortran
       end subroutine B_interp_normalized_regular
 
 
-      subroutine B_interp_irregular(idx_b, idx_dummy1, idx_dummy2, pos_in, B_out)
+      subroutine B_interp_irregular(idx_in, pos_in, B_out)
       !Trilinear interpolation of B at a coordinate surrounded by grid cells
       !First transform to a cell of size [0,1]
       !delta1,2,3 are cell sizes
       !shift1,2,3 are the coordinates transformed to [0,1]
 
-        INTEGER :: idx_b, idx_dummy1, idx_dummy2
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
 
+        INTEGER :: idx_b
         INTEGER :: idx1m, idx2m, idx3m, idx1, idx2, idx3, idx1p, idx2p, idx3p
         REAL(num) :: coord1l, coord1r, coord2l, coord2r, coord3l, coord3r
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx_b = idx_in(1)
         idx_b = find_index_irregular(pos_in,idx_b)
+        idx_in(1) = idx_b
         idx1m = FLOOR((pos_in(1)-grid1_ir(1,idx_b))/(grid1_ir(2,idx_b)-grid1_ir(1,idx_b)) &
                      *REAL(sz_1-1,num))
         if (idx1m .ge. (sz_1-1)) then
@@ -2803,24 +2909,27 @@ module UFiT_Functions_Fortran
       end subroutine B_interp_irregular
 
 
-      subroutine B_interp_normalized_irregular(idx_b, idx_dummy1, idx_dummy2, pos_in, B_out)
+      subroutine B_interp_normalized_irregular(idx_in, pos_in, B_out)
       !Trilinear interpolation of B at a coordinate surrounded by grid cells
       !First normalize B at each vertex
       !First transform to a cell of size [0,1]
       !delta1,2,3 are cell sizes
       !shift1,2,3 are the coordinates transformed to [0,1]
 
-        INTEGER :: idx_b, idx_dummy1, idx_dummy2
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
 
+        INTEGER :: idx_b
         INTEGER :: idx1m, idx2m, idx3m, idx1, idx2, idx3, idx1p, idx2p, idx3p
         REAL(num) :: coord1l, coord1r, coord2l, coord2r, coord3l, coord3r
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx_b = idx_in(1)
         idx_b = find_index_irregular(pos_in,idx_b)
+        idx_in(1) = idx_b
         idx1m = FLOOR((pos_in(1)-grid1_ir(1,idx_b))/(grid1_ir(2,idx_b)-grid1_ir(1,idx_b)) &
                      *REAL(sz_1-1,num))
         if (idx1m .ge. (sz_1-1)) then
@@ -2883,7 +2992,7 @@ module UFiT_Functions_Fortran
       end subroutine B_interp_normalized_irregular
 
 
-      subroutine B_gradB_interp_regular(idx1, idx2, idx3, pos_in, B_out, gradB_out)
+      subroutine B_gradB_interp_regular(idx_in, pos_in, B_out, gradB_out)
       !Trilinear interpolation of B at a coordinate surrounded by grid cells
       !Transform to a cell of size [0,1]
       !delta1,2,3 are cell sizes
@@ -2891,19 +3000,26 @@ module UFiT_Functions_Fortran
       !Also returns gradient, gradB_out(i,j) is d B_i / d x_j
       !Note: Cartesian only, needs to be divided by R etc afterwards for spherical (effectively just partial derivatives)
 
-        INTEGER :: idx1, idx2, idx3
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
         REAL(num), INTENT(OUT) :: gradB_out(3,3)
 
+        INTEGER :: idx1, idx2, idx3
         INTEGER :: idx1p, idx2p, idx3p
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx1 = idx_in(1)
+        idx2 = idx_in(2)
+        idx3 = idx_in(3)
         idx1 = find_index(grid1,sz_1,pos_in(1),idx1)
         idx2 = find_index(grid2,sz_2,pos_in(2),idx2)
         idx3 = find_index(grid3,sz_3,pos_in(3),idx3)
+        idx_in(1) = idx1
+        idx_in(2) = idx2
+        idx_in(3) = idx3
         idx1p = idx1+1
         idx2p = idx2+1
         idx3p = idx3+1
@@ -2940,7 +3056,97 @@ module UFiT_Functions_Fortran
       end subroutine B_gradB_interp_regular
 
 
-      subroutine B_gradB_interp_normalized_regular(idx1, idx2, idx3, pos_in, B_out, gradB_out)
+      subroutine grad_interp_single_regular(idx1, idx2, idx3, sz_1, sz_2, sz_3, grid1, &
+                                            grid2, grid3, array_in, pos_in, value_out, grad_out)
+      !Trilinear interpolation of B at a coordinate surrounded by grid cells
+      !Transform to a cell of size [0,1]
+      !delta1,2,3 are cell sizes
+      !shift1,2,3 are the coordinates transformed to [0,1]
+      !Also returns gradient, grad_out(j) is d array_in / d x_j
+      !Note: Cartesian only, needs to be divided by R etc afterwards for spherical (effectively just partial derivatives)
+
+        INTEGER :: idx1, idx2, idx3
+        INTEGER :: sz_1, sz_2, sz_3
+        REAL(num), DIMENSION(:), ALLOCATABLE :: grid1
+        REAL(num), DIMENSION(:), ALLOCATABLE :: grid2
+        REAL(num), DIMENSION(:), ALLOCATABLE :: grid3
+        REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: array_in
+        REAL(num), INTENT(IN) :: pos_in(3)
+        REAL(num), INTENT(OUT) :: value_out
+        REAL(num), INTENT(OUT) :: grad_out(3)
+
+        INTEGER :: idx1p, idx2p, idx3p
+        REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
+        REAL(num) :: a1, a2, a3, a4, a5, a6, a7
+        REAL(num) :: arr000, arr001, arr010, arr011, arr100, arr101, arr110, arr111
+
+        idx1 = find_index(grid1,sz_1,pos_in(1),idx1)
+        idx2 = find_index(grid2,sz_2,pos_in(2),idx2)
+        idx3 = find_index(grid3,sz_3,pos_in(3),idx3)
+        idx1p = idx1+1
+        idx2p = idx2+1
+        idx3p = idx3+1
+        arr000 = array_in(idx1,idx2,idx3)
+        arr001 = array_in(idx1,idx2,idx3p)
+        arr010 = array_in(idx1,idx2p,idx3)
+        arr011 = array_in(idx1,idx2p,idx3p)
+        arr100 = array_in(idx1p,idx2,idx3)
+        arr101 = array_in(idx1p,idx2,idx3p)
+        arr110 = array_in(idx1p,idx2p,idx3)
+        arr111 = array_in(idx1p,idx2p,idx3p)
+
+        delta1 = grid1(idx1p) - grid1(idx1)
+        delta2 = grid2(idx2p) - grid2(idx2)
+        delta3 = grid3(idx3p) - grid3(idx3)
+        shift1 = (pos_in(1) - grid1(idx1))/delta1
+        shift2 = (pos_in(2) - grid2(idx2))/delta2
+        shift3 = (pos_in(3) - grid3(idx3))/delta3
+        a1 = arr100-arr000
+        a2 = arr010-arr000
+        a3 = arr001-arr000
+        a4 = arr110-arr100-arr010+arr000
+        a5 = arr101-arr100-arr001+arr000
+        a6 = arr011-arr001-arr010+arr000
+        a7 = arr111-arr110-arr101-arr011+arr001+arr010+arr100-arr000
+
+        value_out = arr000 + a1*shift1 + a2*shift2 + a3*shift3 + a4*shift1*shift2 &
+               + a5*shift1*shift3 + a6*shift2*shift3 + a7*shift1*shift2*shift3
+
+        grad_out(1) = (a1 + a4*shift2 + a5*shift3 + a7*shift2*shift3) / delta1
+        grad_out(2) = (a2 + a4*shift1 + a6*shift3 + a7*shift1*shift3) / delta2
+        grad_out(3) = (a3 + a5*shift1 + a6*shift2 + a7*shift1*shift2) / delta3
+
+      end subroutine grad_interp_single_regular
+
+
+      subroutine B_gradB_interp_regular_separate(idx_in, pos_in, B_out, gradB_out)
+      !Trilinear interpolation of B at a coordinate surrounded by grid cells
+      !Each component of B has a separate array (e.g. staggered grid)
+      !First transform to a cell of size [0,1]
+      !delta1,2,3 are cell sizes
+      !shift1,2,3 are the coordinates transformed to [0,1]
+
+        INTEGER :: idx_in(9)
+        REAL(num), INTENT(IN) :: pos_in(3)
+        REAL(num), INTENT(OUT) :: B_out(3)
+        REAL(num), INTENT(OUT) :: gradB_out(3,3)
+
+        REAL(num) :: grad_temp(3)
+
+        call grad_interp_single_regular(idx_in(1), idx_in(2), idx_in(3), sz_11, sz_12, sz_13, &
+                              grid1_1, grid1_2, grid1_3, B_grid1, pos_in, B_out(1), grad_temp)
+        gradB_out(1,:) = grad_temp(:)
+        call grad_interp_single_regular(idx_in(4), idx_in(5), idx_in(6), sz_21, sz_22, sz_23, &
+                              grid2_1, grid2_2, grid2_3, B_grid2, pos_in, B_out(2), grad_temp)
+        gradB_out(2,:) = grad_temp(:)
+        call grad_interp_single_regular(idx_in(7), idx_in(8), idx_in(9), sz_31, sz_32, sz_33, &
+                              grid3_1, grid3_2, grid3_3, B_grid3, pos_in, B_out(3), grad_temp)
+        gradB_out(3,:) = grad_temp(:)
+
+      end subroutine B_gradB_interp_regular_separate
+
+
+      subroutine B_gradB_interp_normalized_regular(idx_in, pos_in, B_out, gradB_out)
       !Trilinear interpolation of norm(B) at a coordinate surrounded by grid cells
       !First normalize B at each vertex
       !Transform to a cell of size [0,1]
@@ -2949,19 +3155,26 @@ module UFiT_Functions_Fortran
       !Also returns gradient, gradB_out(i,j) is d B_i / d x_j
       !Note: Cartesian only, needs to be divided by R etc afterwards for spherical (effectively just partial derivatives)
 
-        INTEGER :: idx1, idx2, idx3
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
         REAL(num), INTENT(OUT) :: gradB_out(3,3)
 
+        INTEGER :: idx1, idx2, idx3
         INTEGER :: idx1p, idx2p, idx3p
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx1 = idx_in(1)
+        idx2 = idx_in(2)
+        idx3 = idx_in(3)
         idx1 = find_index(grid1,sz_1,pos_in(1),idx1)
         idx2 = find_index(grid2,sz_2,pos_in(2),idx2)
         idx3 = find_index(grid3,sz_3,pos_in(3),idx3)
+        idx_in(1) = idx1
+        idx_in(2) = idx2
+        idx_in(3) = idx3
         idx1p = idx1+1
         idx2p = idx2+1
         idx3p = idx3+1
@@ -2998,8 +3211,7 @@ module UFiT_Functions_Fortran
       end subroutine B_gradB_interp_normalized_regular
 
 
-      subroutine B_gradB_interp_irregular(idx_b,idx_dummy1, idx_dummy2, pos_in, B_out, &
-                                                      gradB_out)
+      subroutine B_gradB_interp_irregular(idx_in, pos_in, B_out, gradB_out)
       !Trilinear interpolation of norm(B) at a coordinate surrounded by grid cells
       !First normalize B at each vertex
       !Transform to a cell of size [0,1]
@@ -3008,18 +3220,21 @@ module UFiT_Functions_Fortran
       !Also returns gradient, gradB_out(i,j) is d B_i / d x_j
       !Note: Cartesian only, needs to be divided by R etc afterwards for spherical (effectively just partial derivatives)
 
-        INTEGER :: idx_b, idx_dummy1, idx_dummy2
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
         REAL(num), INTENT(OUT) :: gradB_out(3,3)
 
+        INTEGER :: idx_b
         INTEGER :: idx1m, idx2m, idx3m, idx1, idx2, idx3, idx1p, idx2p, idx3p
         REAL(num) :: coord1l, coord1r, coord2l, coord2r, coord3l, coord3r
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx_b = idx_in(1)
         idx_b = find_index_irregular(pos_in,idx_b)
+        idx_in(1) = idx_b
         idx1m = FLOOR((pos_in(1)-grid1_ir(1,idx_b))/(grid1_ir(2,idx_b)-grid1_ir(1,idx_b)) &
                      *REAL(sz_1-1,num))
         if (idx1m .ge. (sz_1-1)) then
@@ -3086,8 +3301,7 @@ module UFiT_Functions_Fortran
       end subroutine B_gradB_interp_irregular
 
 
-      subroutine B_gradB_interp_normalized_irregular(idx_b,idx_dummy1, idx_dummy2, pos_in, B_out, &
-                                                      gradB_out)
+      subroutine B_gradB_interp_normalized_irregular(idx_in, pos_in, B_out, gradB_out)
       !Trilinear interpolation of norm(B) at a coordinate surrounded by grid cells
       !First normalize B at each vertex
       !Transform to a cell of size [0,1]
@@ -3096,18 +3310,21 @@ module UFiT_Functions_Fortran
       !Also returns gradient, gradB_out(i,j) is d B_i / d x_j
       !Note: Cartesian only, needs to be divided by R etc afterwards for spherical (effectively just partial derivatives)
 
-        INTEGER :: idx_b, idx_dummy1, idx_dummy2
+        INTEGER :: idx_in(9)
         REAL(num), INTENT(IN) :: pos_in(3)
         REAL(num), INTENT(OUT) :: B_out(3)
         REAL(num), INTENT(OUT) :: gradB_out(3,3)
 
+        INTEGER :: idx_b
         INTEGER :: idx1m, idx2m, idx3m, idx1, idx2, idx3, idx1p, idx2p, idx3p
         REAL(num) :: coord1l, coord1r, coord2l, coord2r, coord3l, coord3r
         REAL(num) :: shift1, shift2, shift3, delta1, delta2, delta3
         REAL(num) :: a1(3), a2(3), a3(3), a4(3), a5(3), a6(3), a7(3)
         REAL(num) :: B000(3), B001(3), B010(3), B011(3), B100(3), B101(3), B110(3), B111(3)
 
+        idx_b = idx_in(1)
         idx_b = find_index_irregular(pos_in,idx_b)
+        idx_in(1) = idx_b
         idx1m = FLOOR((pos_in(1)-grid1_ir(1,idx_b))/(grid1_ir(2,idx_b)-grid1_ir(1,idx_b)) &
                      *REAL(sz_1-1,num))
         if (idx1m .ge. (sz_1-1)) then
@@ -3174,10 +3391,10 @@ module UFiT_Functions_Fortran
       end subroutine B_gradB_interp_normalized_irregular
 
 
-      subroutine step_cartesian(idx_x, idx_y, idx_z, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_cartesian(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                 keep_running, check_position, B_interp, B_gradB_interp)
 
-        INTEGER :: idx_x, idx_y, idx_z
+        INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
 
@@ -3189,17 +3406,17 @@ module UFiT_Functions_Fortran
           end subroutine check_position
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -3209,7 +3426,7 @@ module UFiT_Functions_Fortran
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm
 
         call check_position(pos_in,pos_0out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_0out, B_curr)
+        call B_interp(idx_in, pos_0out, B_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_1(:) = B_curr(:)*dl_norm
@@ -3220,10 +3437,10 @@ module UFiT_Functions_Fortran
       end subroutine step_cartesian
 
 
-      subroutine step_cartesian_RK4(idx_x, idx_y, idx_z, pos_in, pos_out, dl, keep_running, &
+      subroutine step_cartesian_RK4(idx_in, pos_in, pos_out, dl, keep_running, &
                                 check_position, B_interp) !TODO - fix and use this
 
-        INTEGER :: idx_x, idx_y, idx_z
+        INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),dl
         LOGICAL :: keep_running
 
@@ -3235,9 +3452,9 @@ module UFiT_Functions_Fortran
           end subroutine check_position
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
@@ -3248,28 +3465,28 @@ module UFiT_Functions_Fortran
         REAL(num) :: B_curr(3)
 
         call check_position(pos_in,pos_0out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_0out, B_curr)
+        call B_interp(idx_in, pos_0out, B_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_1(:) = B_curr(:)*dl_norm
 
         pos_1in(:) = pos_in(:) + 0.5_num*k_1(:) 
         call check_position(pos_1in,pos_1out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_1out, B_curr)
+        call B_interp(idx_in, pos_1out, B_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_2(:) = B_curr(:)*dl_norm
 
         pos_2in(:) = pos_in(:) + 0.5_num*k_2(:)
         call check_position(pos_2in,pos_2out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_2out, B_curr)
+        call B_interp(idx_in, pos_2out, B_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_3(:) = B_curr(:)*dl_norm
 
         pos_3in(:) = pos_in(:) + k_3(:)
         call check_position(pos_3in,pos_3out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_3out, B_curr)
+        call B_interp(idx_in, pos_3out, B_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_4(:) = B_curr(:)*dl_norm
@@ -3280,10 +3497,10 @@ module UFiT_Functions_Fortran
       end subroutine step_cartesian_RK4
 
 
-      subroutine step_cartesianQ(idx_x, idx_y, idx_z, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_cartesianQ(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_interp, B_gradB_interp)
 
-        INTEGER :: idx_x, idx_y, idx_z
+        INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
 
@@ -3295,17 +3512,17 @@ module UFiT_Functions_Fortran
           end subroutine check_position
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -3316,7 +3533,7 @@ module UFiT_Functions_Fortran
         REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3)
 
         call check_position(pos_in,pos_0out,keep_running)
-        call B_gradB_interp(idx_x, idx_y, idx_z, pos_0out, B_curr, gradB_curr)
+        call B_gradB_interp(idx_in, pos_0out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_1(:) = B_curr(:)*dl_norm
@@ -3343,10 +3560,10 @@ module UFiT_Functions_Fortran
       end subroutine step_cartesianQ
 
 
-      subroutine step_cartesianQ_RK4(idx_x, idx_y, idx_z, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_cartesianQ_RK4(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_gradB_interp) !TODO - fix and use this
 
-        INTEGER :: idx_x, idx_y, idx_z
+        INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
 
@@ -3358,9 +3575,9 @@ module UFiT_Functions_Fortran
           end subroutine check_position
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -3375,7 +3592,7 @@ module UFiT_Functions_Fortran
         REAL(num) :: gradB_curr(3,3)
 
         call check_position(pos_in,pos_0out,keep_running)
-        call B_gradB_interp(idx_x, idx_y, idx_z, pos_0out, B_curr, gradB_curr)
+        call B_gradB_interp(idx_in, pos_0out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_1(:) = B_curr(:)*dl_norm
@@ -3396,7 +3613,7 @@ module UFiT_Functions_Fortran
         u_1(:) = u_vec(:) + 0.5_num*k_1u(:)
         v_1(:) = v_vec(:) + 0.5_num*k_1v(:)
         call check_position(pos_1in,pos_1out,keep_running)
-        call B_gradB_interp(idx_x, idx_y, idx_z, pos_1out, B_curr, gradB_curr)
+        call B_gradB_interp(idx_in, pos_1out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_2(:) = B_curr(:)*dl_norm
@@ -3411,7 +3628,7 @@ module UFiT_Functions_Fortran
         u_2(:) = u_vec(:) + 0.5_num*k_2u(:)
         v_2(:) = v_vec(:) + 0.5_num*k_2v(:)
         call check_position(pos_2in,pos_2out,keep_running)
-        call B_gradB_interp(idx_x, idx_y, idx_z, pos_2out, B_curr, gradB_curr)
+        call B_gradB_interp(idx_in, pos_2out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_3(:) = B_curr(:)*dl_norm
@@ -3426,7 +3643,7 @@ module UFiT_Functions_Fortran
         u_3(:) = u_vec(:) + k_3u(:)
         v_3(:) = v_vec(:) + k_3v(:)
         call check_position(pos_3in,pos_3out,keep_running)
-        call B_gradB_interp(idx_x, idx_y, idx_z, pos_3out, B_curr, gradB_curr)
+        call B_gradB_interp(idx_in, pos_3out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         k_4(:) = B_curr(:)*dl_norm
@@ -3447,9 +3664,9 @@ module UFiT_Functions_Fortran
       end subroutine step_cartesianQ_RK4
 
 
-      subroutine trace_cartesian(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                 single_step,pos_start,idx_t,pos_endpoints,pos_Q,pos_fieldline, &
-                                 pos_step_start,pos_step_total,dl)
+      subroutine trace_cartesian(check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                 B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                 pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace fieldlines, keep only endpoints
 
         interface
@@ -3466,27 +3683,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -3497,17 +3722,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -3525,14 +3750,12 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_x, idx_y, idx_z
+        INTEGER :: step_num, idx_in(9)
         LOGICAL :: keep_running
         REAL(num) :: pos_out(3), B_out(3), mod_Bout, last_stepsize
         REAL(num) :: pos_next(3), pos_curr(3), u_0(3), v_0(3)
 
-        idx_x = 1
-        idx_y = 1
-        idx_z = 1
+        idx_in(:) = 1
 
       !Backwards integration
         pos_next(:) = pos_start(:)
@@ -3540,17 +3763,17 @@ module UFiT_Functions_Fortran
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_x, idx_y, idx_z, pos_curr(:), pos_next(:), u_0, v_0, -dl, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, -dl, &
                                keep_running, check_position, B_interp, B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_x, idx_y, idx_z, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
         end if
@@ -3562,17 +3785,17 @@ module UFiT_Functions_Fortran
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_x, idx_y, idx_z, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                dl, keep_running, check_position, B_interp, B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_x, idx_y,idx_z,pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in,pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
@@ -3597,9 +3820,9 @@ module UFiT_Functions_Fortran
       end subroutine trace_cartesian
 
 
-      subroutine trace_cartesian_f(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                   single_step,pos_start,idx_t,pos_endpoints,pos_Q, &
-                                   pos_fieldline,pos_step_start,pos_step_total,dl)
+      subroutine trace_cartesian_f(check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                   B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and keep full fieldline locations
 
         interface
@@ -3616,27 +3839,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -3647,17 +3878,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -3675,20 +3906,18 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_x, idx_y, idx_z,step_start,step_total
+        INTEGER :: step_num, idx_in(9),step_start,step_total
         LOGICAL :: keep_running
         REAL(num) :: pos_out(3), B_out(3), mod_Bout, last_stepsize, u_0(3), v_0(3)
 
         pos_fieldline(:,MAX_STEPS+1,idx_t) = pos_start(:)
-        idx_x = 1
-        idx_y = 1
-        idx_z = 1
+        idx_in(:) = 1
 
       !Backwards integration
         step_num = 1
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_x, idx_y, idx_z, pos_fieldline(:,MAX_STEPS+2-step_num,idx_t), &
+          call single_step(idx_in, pos_fieldline(:,MAX_STEPS+2-step_num,idx_t), &
                                pos_fieldline(:,MAX_STEPS+1-step_num,idx_t), u_0, v_0, &
                                -dl, keep_running, check_position, B_interp, B_gradB_interp)
           step_num = step_num + 1
@@ -3697,11 +3926,11 @@ module UFiT_Functions_Fortran
         pos_step_start(idx_t) = step_start
         if (.not. keep_running) then
           call check_position(pos_fieldline(:,step_start+1,idx_t),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_start+1,idx_t),B_out,last_stepsize)
-          call single_step(idx_x, idx_y, idx_z, pos_fieldline(:,step_start+1,idx_t), &
+          call single_step(idx_in, pos_fieldline(:,step_start+1,idx_t), &
                               pos_fieldline(:,step_start,idx_t), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
@@ -3712,7 +3941,7 @@ module UFiT_Functions_Fortran
         step_num = 1
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_x, idx_y, idx_z, pos_fieldline(:,MAX_STEPS+step_num,idx_t), &
+          call single_step(idx_in, pos_fieldline(:,MAX_STEPS+step_num,idx_t), &
                                pos_fieldline(:,MAX_STEPS+1+step_num,idx_t), u_0, v_0, &
                                dl, keep_running, check_position, B_interp, B_gradB_interp)
           step_num = step_num + 1
@@ -3721,12 +3950,12 @@ module UFiT_Functions_Fortran
         pos_step_total(idx_t) = step_total
         if (.not. keep_running) then
           call check_position(pos_fieldline(:,step_total+step_start-2,idx_t),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_total+step_start-2,idx_t),B_out, &
                                   last_stepsize)
-          call single_step(idx_x, idx_y,idx_z,pos_fieldline(:,step_total+step_start-2,idx_t), &
+          call single_step(idx_in,pos_fieldline(:,step_total+step_start-2,idx_t), &
                                pos_fieldline(:,step_total+step_start-1,idx_t), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
@@ -3752,9 +3981,9 @@ module UFiT_Functions_Fortran
       end subroutine trace_cartesian_f
 
 
-      subroutine trace_cartesian_Q(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                   single_step,pos_start,idx_t,pos_endpoints,pos_Q, &
-                                   pos_fieldline,pos_step_start,pos_step_total,dl)
+      subroutine trace_cartesian_Q(check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                   B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and calculate Q
 
         interface
@@ -3771,27 +4000,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -3802,17 +4039,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -3830,18 +4067,16 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_x, idx_y, idx_z
+        INTEGER :: step_num, idx_in(9)
         LOGICAL :: keep_running
         REAL(num) :: B_0(3), u_0(3), v_0(3), pos_out(3), B_out(3), mod_Bout, last_stepsize
         REAL(num) :: B_up(3), u_up(3), v_up(3), u_upt(3), v_upt(3)
         REAL(num) :: B_down(3), u_down(3), v_down(3), u_downt(3), v_downt(3)
         REAL(num) :: mod_B0, mod_Bup, mod_Bdown, Q_sign, pos_next(3), pos_curr(3)
 
-        idx_x = 1
-        idx_y = 1
-        idx_z = 1
+        idx_in(:) = 1
         call check_position(pos_start,pos_out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_out, B_0)
+        call Bfull_interp(idx_in, pos_out, B_0)
         mod_B0 = SQRT(B_0(1)**2+B_0(2)**2+B_0(3)**2)
         call create_perpendicular_vectors(B_0,u_0,v_0)
 
@@ -3853,23 +4088,23 @@ module UFiT_Functions_Fortran
         v_down(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_x, idx_y, idx_z, pos_curr(:), pos_next(:), u_down, v_down, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -dl, keep_running, check_position, B_interp, B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_x, idx_y, idx_z, pos_curr(:), pos_next(:), u_down, v_down, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
         pos_endpoints(1:3,idx_t) = pos_next(:)
         call check_position(pos_endpoints(1:3,idx_t),pos_out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_out, B_down)
+        call Bfull_interp(idx_in, pos_out, B_down)
         mod_Bdown = SQRT(B_down(1)**2+B_down(2)**2+B_down(3)**2)
         u_downt(:) = u_down(:) - B_down(:)*vecdot(u_down,B_down)/(mod_Bdown**2)
         v_downt(:) = v_down(:) - B_down(:)*vecdot(v_down,B_down)/(mod_Bdown**2)
@@ -3882,24 +4117,24 @@ module UFiT_Functions_Fortran
         v_up(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_x, idx_y, idx_z, pos_curr(:), pos_next(:), u_up, v_up, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_up, v_up, &
                                dl, keep_running, check_position, B_interp, B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out, &
                                   last_stepsize)
-          call single_step(idx_x, idx_y,idx_z,pos_curr(:), pos_next(:), u_down, v_down, &
+          call single_step(idx_in,pos_curr(:), pos_next(:), u_down, v_down, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
         pos_endpoints(4:6,idx_t) = pos_next(:)
         call check_position(pos_endpoints(4:6,idx_t),pos_out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_out, B_up)
+        call Bfull_interp(idx_in, pos_out, B_up)
         mod_Bup = SQRT(B_up(1)**2+B_up(2)**2+B_up(3)**2)
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
@@ -3940,9 +4175,9 @@ module UFiT_Functions_Fortran
       end subroutine trace_cartesian_Q
 
 
-      subroutine trace_cartesian_Qf(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                    single_step,pos_start,idx_t,pos_endpoints,pos_Q, &
-                                    pos_fieldline,pos_step_start,pos_step_total,dl)
+      subroutine trace_cartesian_Qf(check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                    B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace, calculate Q and keep full fieldline locations
 
         interface
@@ -3959,27 +4194,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -3990,17 +4233,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4018,7 +4261,7 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_x, idx_y, idx_z,step_start,step_total
+        INTEGER :: step_num, idx_in(9),step_start,step_total
         LOGICAL :: keep_running
         REAL(num) :: B_0(3), u_0(3), v_0(3), pos_out(3), B_out(3), mod_Bout, last_stepsize
         REAL(num) :: B_up(3), u_up(3), v_up(3), u_upt(3), v_upt(3)
@@ -4026,11 +4269,9 @@ module UFiT_Functions_Fortran
         REAL(num) :: mod_B0, mod_Bup, mod_Bdown, Q_sign
 
         pos_fieldline(:,MAX_STEPS+1,idx_t) = pos_start(:)
-        idx_x = 1
-        idx_y = 1
-        idx_z = 1
+        idx_in(:) = 1
         call check_position(pos_start,pos_out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_out, B_0)
+        call Bfull_interp(idx_in, pos_out, B_0)
         mod_B0 = SQRT(B_0(1)**2+B_0(2)**2+B_0(3)**2)
         call create_perpendicular_vectors(B_0,u_0,v_0)
 
@@ -4040,7 +4281,7 @@ module UFiT_Functions_Fortran
         u_down(:) = u_0(:)
         v_down(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_x, idx_y, idx_z, pos_fieldline(:,MAX_STEPS+2-step_num,idx_t), &
+          call single_step(idx_in, pos_fieldline(:,MAX_STEPS+2-step_num,idx_t), &
                                pos_fieldline(:,MAX_STEPS+1-step_num,idx_t), u_down, v_down,  &
                                -dl, keep_running, check_position, B_interp, B_gradB_interp)
           step_num = step_num + 1
@@ -4049,18 +4290,18 @@ module UFiT_Functions_Fortran
         pos_step_start(idx_t) = step_start
         if (.not. keep_running) then
           call check_position(pos_fieldline(:,step_start+1,idx_t),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_start+1,idx_t),B_out,last_stepsize)
-          call single_step(idx_x, idx_y, idx_z, pos_fieldline(:,step_start+1,idx_t), &
+          call single_step(idx_in, pos_fieldline(:,step_start+1,idx_t), &
                                pos_fieldline(:,step_start,idx_t), u_down, v_down,  &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
         pos_endpoints(1:3,idx_t) = pos_fieldline(:,step_start,idx_t)
         call check_position(pos_endpoints(1:3,idx_t),pos_out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_out, B_down)
+        call Bfull_interp(idx_in, pos_out, B_down)
         mod_Bdown = SQRT(B_down(1)**2+B_down(2)**2+B_down(3)**2)
         u_downt(:) = u_down(:) - B_down(:)*vecdot(u_down,B_down)/(mod_Bdown**2)
         v_downt(:) = v_down(:) - B_down(:)*vecdot(v_down,B_down)/(mod_Bdown**2)
@@ -4071,7 +4312,7 @@ module UFiT_Functions_Fortran
         u_up(:) = u_0(:)
         v_up(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
-          call single_step(idx_x, idx_y, idx_z, pos_fieldline(:,MAX_STEPS+step_num,idx_t), &
+          call single_step(idx_in, pos_fieldline(:,MAX_STEPS+step_num,idx_t), &
                                pos_fieldline(:,MAX_STEPS+1+step_num,idx_t), u_up, v_up,   &
                                dl, keep_running, check_position,B_interp, B_gradB_interp)
           step_num = step_num + 1
@@ -4080,19 +4321,19 @@ module UFiT_Functions_Fortran
         pos_step_total(idx_t) = step_total
         if (.not. keep_running) then
           call check_position(pos_fieldline(:,step_total+step_start-2,idx_t),pos_out,keep_running)
-          call B_interp(idx_x, idx_y, idx_z, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_total+step_start-2,idx_t),B_out, &
                                   last_stepsize)
-          call single_step(idx_x,idx_y,idx_z,pos_fieldline(:,step_total+step_start-2,idx_t), &
+          call single_step(idx_in,pos_fieldline(:,step_total+step_start-2,idx_t), &
                                pos_fieldline(:,step_total+step_start-1,idx_t), u_down, v_down,  &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
         pos_endpoints(4:6,idx_t) = pos_fieldline(:,step_total+step_start-1,idx_t)
         call check_position(pos_endpoints(4:6,idx_t),pos_out,keep_running)
-        call B_interp(idx_x, idx_y, idx_z, pos_out, B_up)
+        call Bfull_interp(idx_in, pos_out, B_up)
         mod_Bup = SQRT(B_up(1)**2+B_up(2)**2+B_up(3)**2)
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
@@ -4133,10 +4374,10 @@ module UFiT_Functions_Fortran
       end subroutine trace_cartesian_Qf
 
 
-      subroutine step_spherical(idx_r, idx_t, idx_p, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_spherical(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                 keep_running, check_position, B_interp, B_gradB_interp)
 
-        INTEGER :: idx_r, idx_t, idx_p
+        INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
 
@@ -4148,17 +4389,17 @@ module UFiT_Functions_Fortran
           end subroutine check_position
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4168,7 +4409,7 @@ module UFiT_Functions_Fortran
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm, r_sin_th
 
         call check_position(pos_in,pos_0out,keep_running)
-        call B_interp(idx_r, idx_t, idx_p, pos_0out, B_curr)
+        call B_interp(idx_in, pos_0out, B_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         r_sin_th = pos_0out(1)*SIN(pos_0out(2))
@@ -4182,12 +4423,12 @@ module UFiT_Functions_Fortran
       end subroutine step_spherical
 
 
-      subroutine step_sphericalQnoc(idx_r, idx_t, idx_p, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_sphericalQnoc(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_interp, B_gradB_interp)
       !This subroutine is now deprecated; in principle, it should approach QSLsquasher
       !Note - gradB_curr is just partial derivatives, not actual gradient in sphericals
 
-        INTEGER :: idx_r, idx_t, idx_p
+        INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
 
@@ -4199,17 +4440,17 @@ module UFiT_Functions_Fortran
           end subroutine check_position
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4220,7 +4461,7 @@ module UFiT_Functions_Fortran
         REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3), r_sin_th, cot_th
 
         call check_position(pos_in,pos_0out,keep_running)
-        call B_gradB_interp(idx_r, idx_t, idx_p, pos_0out, B_curr, gradB_curr)
+        call B_gradB_interp(idx_in, pos_0out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         r_sin_th = pos_0out(1)*SIN(pos_0out(2))
@@ -4284,12 +4525,12 @@ module UFiT_Functions_Fortran
       end subroutine step_sphericalQnoc
 
 
-      subroutine step_sphericalQ(idx_r, idx_t, idx_p, pos_in, pos_out, u_vec, v_vec, dl, &
+      subroutine step_sphericalQ(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_interp, B_gradB_interp)
       !Note - gradB_curr is just partial derivatives, not actual gradient in sphericals
       !include curvature 
 
-        INTEGER :: idx_r, idx_t, idx_p
+        INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
 
@@ -4301,17 +4542,17 @@ module UFiT_Functions_Fortran
           end subroutine check_position
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4322,7 +4563,7 @@ module UFiT_Functions_Fortran
         REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3), r_sin_th, cot_th
 
         call check_position(pos_in,pos_0out,keep_running)
-        call B_gradB_interp(idx_r, idx_t, idx_p, pos_0out, B_curr, gradB_curr)
+        call B_gradB_interp(idx_in, pos_0out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
         r_sin_th = pos_0out(1)*SIN(pos_0out(2))
@@ -4358,9 +4599,9 @@ module UFiT_Functions_Fortran
       end subroutine step_sphericalQ
 
 
-      subroutine trace_spherical(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                 single_step,pos_start,idx_t,pos_endpoints,pos_Q, &
-                                 pos_fieldline,pos_step_start,pos_step_total,dl)
+      subroutine trace_spherical(check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                 B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                 pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace fieldlines, keep only endpoints
 
         interface
@@ -4377,27 +4618,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -4408,17 +4657,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4436,14 +4685,12 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_r, idx_th, idx_p
+        INTEGER :: step_num, idx_in(9)
         LOGICAL :: keep_running
         REAL(num) :: pos_out(3), B_out(3), mod_Bout, last_stepsize
         REAL(num) :: pos_next(3), pos_curr(3), u_0(3), v_0(3)
 
-        idx_r = 1
-        idx_th = 1
-        idx_p = 1
+        idx_in(:) = 1
 
       !Backwards integration
         pos_next(:) = pos_start(:)
@@ -4451,17 +4698,17 @@ module UFiT_Functions_Fortran
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, -dl, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, -dl, &
                                keep_running, check_position,B_interp, B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
         end if
@@ -4473,17 +4720,17 @@ module UFiT_Functions_Fortran
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                dl, keep_running, check_position,B_interp, B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
@@ -4508,9 +4755,9 @@ module UFiT_Functions_Fortran
       end subroutine trace_spherical
 
 
-      subroutine trace_spherical_f(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                   single_step,pos_start,idx_t,pos_endpoints,pos_Q, &
-                                   pos_fieldline,pos_step_start,pos_step_total,dl)
+      subroutine trace_spherical_f(check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                   B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and keep full fieldline locations
 
         interface
@@ -4527,27 +4774,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -4558,17 +4813,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4586,15 +4841,13 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_r, idx_th, idx_p, step_start, step_total
+        INTEGER :: step_num, idx_in(9), step_start, step_total
         LOGICAL :: keep_running
         REAL(num) :: pos_out(3), B_out(3), mod_Bout, last_stepsize, u_0(3), v_0(3)
         REAL(num) :: pos_next(3), pos_curr(3)
 
         pos_fieldline(:,MAX_STEPS+1,idx_t) = pos_start(:)
-        idx_r = 1
-        idx_th = 1
-        idx_p = 1
+        idx_in(:) = 1
 
       !Backwards integration
         pos_next(:) = pos_start(:)
@@ -4602,7 +4855,7 @@ module UFiT_Functions_Fortran
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, -dl, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, -dl, &
                                keep_running, check_position,B_interp, B_gradB_interp)
           pos_fieldline(:,MAX_STEPS+1-step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
@@ -4611,11 +4864,11 @@ module UFiT_Functions_Fortran
         pos_step_start(idx_t) = step_start
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
           pos_fieldline(:,step_start,idx_t) = pos_next(:)
@@ -4628,7 +4881,7 @@ module UFiT_Functions_Fortran
         keep_running = .true.
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                dl, keep_running, check_position,B_interp, B_gradB_interp)
           pos_fieldline(:,MAX_STEPS+1+step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
@@ -4637,11 +4890,11 @@ module UFiT_Functions_Fortran
         pos_step_total(idx_t) = step_total
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_0, v_0, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
           pos_fieldline(:,step_total+step_start-1,idx_t) = pos_next(:)
@@ -4667,9 +4920,9 @@ module UFiT_Functions_Fortran
       end subroutine trace_spherical_f
 
 
-      subroutine trace_spherical_Q(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                   single_step,pos_start,idx_t,pos_endpoints,pos_Q, &
-                                   pos_fieldline,pos_step_start,pos_step_total,dl)
+      subroutine trace_spherical_Q(check_position,intercept_boundary,B_interp,Bfull_interp,&
+                                   B_gradB_interp, single_step,pos_start,idx_t,pos_endpoints, &
+                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and calculate Q
 
         interface
@@ -4686,27 +4939,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -4717,17 +4978,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4745,18 +5006,16 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_r, idx_th, idx_p
+        INTEGER :: step_num, idx_in(9)
         LOGICAL :: keep_running
         REAL(num) :: B_0(3), u_0(3), v_0(3), pos_out(3), B_out(3), mod_Bout, last_stepsize
         REAL(num) :: B_up(3), u_up(3), v_up(3), u_upt(3), v_upt(3)
         REAL(num) :: B_down(3), u_down(3), v_down(3), u_downt(3), v_downt(3)
         REAL(num) :: mod_B0, mod_Bup, mod_Bdown, Q_sign, pos_next(3), pos_curr(3)
 
-        idx_r = 1
-        idx_th = 1
-        idx_p = 1
+        idx_in(:) = 1
         call check_position(pos_start,pos_out,keep_running)
-        call B_interp(idx_r, idx_th, idx_p, pos_out, B_0)
+        call Bfull_interp(idx_in, pos_out, B_0)
         mod_B0 = SQRT(B_0(1)**2+B_0(2)**2+B_0(3)**2)
         call create_perpendicular_vectors(B_0,u_0,v_0)
 
@@ -4768,23 +5027,23 @@ module UFiT_Functions_Fortran
         v_down(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_down, v_down, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -dl, keep_running, check_position,B_interp,B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_down, v_down, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
         end if
         pos_endpoints(1:3,idx_t) = pos_next(:)
         call check_position(pos_endpoints(1:3,idx_t),pos_out,keep_running)
-        call B_interp(idx_r, idx_th, idx_p, pos_out, B_down)
+        call Bfull_interp(idx_in, pos_out, B_down)
         mod_Bdown = SQRT(B_down(1)**2+B_down(2)**2+B_down(3)**2)
         u_downt(:) = u_down(:) - B_down(:)*vecdot(u_down,B_down)/(mod_Bdown**2)
         v_downt(:) = v_down(:) - B_down(:)*vecdot(v_down,B_down)/(mod_Bdown**2)
@@ -4797,24 +5056,24 @@ module UFiT_Functions_Fortran
         v_up(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_up, v_up, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_up, v_up, &
                                dl, keep_running, check_position,B_interp,B_gradB_interp)
           step_num = step_num + 1
         end do
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out, &
                                   last_stepsize)
-          call single_step(idx_r, idx_th,idx_p,pos_curr(:), pos_next(:), u_up, v_up, &
+          call single_step(idx_in,pos_curr(:), pos_next(:), u_up, v_up, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
         end if
         pos_endpoints(4:6,idx_t) = pos_next(:)
         call check_position(pos_endpoints(4:6,idx_t),pos_out,keep_running)
-        call B_interp(idx_r, idx_th, idx_p, pos_out, B_up)
+        call Bfull_interp(idx_in, pos_out, B_up)
         mod_Bup = SQRT(B_up(1)**2+B_up(2)**2+B_up(3)**2)
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
@@ -4855,9 +5114,9 @@ module UFiT_Functions_Fortran
       end subroutine trace_spherical_Q
 
 
-      subroutine trace_spherical_Qf(check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                    single_step,pos_start,idx_t,pos_endpoints,pos_Q, &
-                                    pos_fieldline,pos_step_start,pos_step_total,dl)
+      subroutine trace_spherical_Qf(check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                    B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace, calculate Q and keep full fieldline locations
 
         interface
@@ -4874,27 +5133,35 @@ module UFiT_Functions_Fortran
           end subroutine intercept_boundary
         end interface
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
           end subroutine B_gradB_interp
         end interface
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -4905,17 +5172,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -4933,7 +5200,7 @@ module UFiT_Functions_Fortran
         INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
         REAL(num) :: dl
 
-        INTEGER :: step_num, idx_r, idx_th, idx_p, step_start, step_total
+        INTEGER :: step_num, idx_in(9), step_start, step_total
         LOGICAL :: keep_running
         REAL(num) :: B_0(3), u_0(3), v_0(3), pos_out(3), B_out(3), mod_Bout, last_stepsize
         REAL(num) :: B_up(3), u_up(3), v_up(3), u_upt(3), v_upt(3)
@@ -4941,11 +5208,9 @@ module UFiT_Functions_Fortran
         REAL(num) :: mod_B0, mod_Bup, mod_Bdown, Q_sign, pos_next(3), pos_curr(3)
 
         pos_fieldline(:,MAX_STEPS+1,idx_t) = pos_start(:)
-        idx_r = 1
-        idx_th = 1
-        idx_p = 1
+        idx_in(:) = 1
         call check_position(pos_start,pos_out,keep_running)
-        call B_interp(idx_r, idx_th, idx_p, pos_out, B_0)
+        call Bfull_interp(idx_in, pos_out, B_0)
         mod_B0 = SQRT(B_0(1)**2+B_0(2)**2+B_0(3)**2)
         call create_perpendicular_vectors(B_0,u_0,v_0)
 
@@ -4957,7 +5222,7 @@ module UFiT_Functions_Fortran
         v_down(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_down, v_down, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -dl, keep_running, check_position,B_interp,B_gradB_interp)
           pos_fieldline(:,MAX_STEPS+1-step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
@@ -4966,18 +5231,18 @@ module UFiT_Functions_Fortran
         pos_step_start(idx_t) = step_start
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_down, v_down, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
           pos_fieldline(:,step_start,idx_t) = pos_next(:)
         end if
         pos_endpoints(1:3,idx_t) = pos_next(:)
         call check_position(pos_endpoints(1:3,idx_t),pos_out,keep_running)
-        call B_interp(idx_r, idx_th, idx_p, pos_out, B_down)
+        call Bfull_interp(idx_in, pos_out, B_down)
         mod_Bdown = SQRT(B_down(1)**2+B_down(2)**2+B_down(3)**2)
         u_downt(:) = u_down(:) - B_down(:)*vecdot(u_down,B_down)/(mod_Bdown**2)
         v_downt(:) = v_down(:) - B_down(:)*vecdot(v_down,B_down)/(mod_Bdown**2)
@@ -4990,7 +5255,7 @@ module UFiT_Functions_Fortran
         v_up(:) = v_0(:)
         do while (keep_running .and. (step_num .le. MAX_STEPS))
           pos_curr(:) = pos_next(:)
-          call single_step(idx_r, idx_th, idx_p, pos_curr(:), pos_next(:), u_up, v_up, &
+          call single_step(idx_in, pos_curr(:), pos_next(:), u_up, v_up, &
                                dl, keep_running, check_position,B_interp,B_gradB_interp)
           pos_fieldline(:,MAX_STEPS+1+step_num,idx_t) = pos_next(:)
           step_num = step_num + 1
@@ -4999,19 +5264,19 @@ module UFiT_Functions_Fortran
         pos_step_total(idx_t) = step_total
         if (.not. keep_running) then
           call check_position(pos_curr(:),pos_out,keep_running)
-          call B_interp(idx_r, idx_th, idx_p, pos_out, B_out)
+          call B_interp(idx_in, pos_out, B_out)
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out, &
                                   last_stepsize)
-          call single_step(idx_r, idx_th,idx_p,pos_curr(:), pos_next(:), u_up, v_up, &
+          call single_step(idx_in,pos_curr(:), pos_next(:), u_up, v_up, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
           pos_fieldline(:,step_total+step_start-1,idx_t) = pos_next(:)
         end if
         pos_endpoints(4:6,idx_t) = pos_next(:)
         call check_position(pos_endpoints(4:6,idx_t),pos_out,keep_running)
-        call B_interp(idx_r, idx_th, idx_p, pos_out, B_up)
+        call Bfull_interp(idx_in, pos_out, B_up)
         mod_Bup = SQRT(B_up(1)**2+B_up(2)**2+B_up(3)**2)
         u_upt(:) = u_up(:) - B_up(:)*vecdot(u_up,B_up)/(mod_Bup**2)
         v_upt(:) = v_up(:) - B_up(:)*vecdot(v_up,B_up)/(mod_Bup**2)
@@ -5081,18 +5346,27 @@ module UFiT_Functions_Fortran
         end interface
 
         interface
-          subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+          subroutine B_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
           end subroutine B_interp
         end interface
 
         interface
-          subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+          subroutine Bfull_interp (idx_in, pos_in, B_out)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
+            REAL(num), INTENT(IN) :: pos_in(3)
+            REAL(num), INTENT(OUT) :: B_out(3)
+          end subroutine Bfull_interp
+        end interface
+
+        interface
+          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+            IMPORT :: num
+            INTEGER :: idx_in(9)
             REAL(num), INTENT(IN) :: pos_in(3)
             REAL(num), INTENT(OUT) :: B_out(3)
             REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -5100,10 +5374,10 @@ module UFiT_Functions_Fortran
         end interface
 
         interface
-          subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                  keep_running, check_position, B_interp, B_gradB_interp)
+          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
             IMPORT :: num
-            INTEGER :: idx1, idx2, idx3
+            INTEGER :: idx_in(9)
             REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
             LOGICAL :: keep_running
             interface
@@ -5114,17 +5388,17 @@ module UFiT_Functions_Fortran
               end subroutine check_position
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -5134,9 +5408,9 @@ module UFiT_Functions_Fortran
         end interface
 
         interface
-          subroutine trace_fl (check_position,intercept_boundary,B_interp,B_gradB_interp, &
-                                single_step,pos_start,idx_t,pos_endpoints,pos_Q,pos_fieldline, &
-                                pos_step_start,pos_step_total,dl)
+          subroutine trace_fl (check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
             IMPORT :: num, MAX_STEPS
             interface
               subroutine check_position (pos_in,pos_out,res)
@@ -5152,27 +5426,35 @@ module UFiT_Functions_Fortran
               end subroutine intercept_boundary
             end interface
             interface
-              subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+              subroutine B_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
               end subroutine B_interp
             end interface
             interface
-              subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+              subroutine Bfull_interp (idx_in, pos_in, B_out)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
+                REAL(num), INTENT(IN) :: pos_in(3)
+                REAL(num), INTENT(OUT) :: B_out(3)
+              end subroutine Bfull_interp
+            end interface
+            interface
+              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
+                IMPORT :: num
+                INTEGER :: idx_in(9)
                 REAL(num), INTENT(IN) :: pos_in(3)
                 REAL(num), INTENT(OUT) :: B_out(3)
                 REAL(num), INTENT(OUT) :: gradB_out(3,3)
               end subroutine B_gradB_interp
             end interface
             interface
-              subroutine single_step (idx1, idx2, idx3, pos_in, pos_out, u_vec, v_vec, dl, &
-                                      keep_running, check_position, B_interp, B_gradB_interp)
+              subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                      check_position, B_interp, B_gradB_interp)
                 IMPORT :: num
-                INTEGER :: idx1, idx2, idx3
+                INTEGER :: idx_in(9)
                 REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
                 LOGICAL :: keep_running
                 interface
@@ -5183,17 +5465,17 @@ module UFiT_Functions_Fortran
                   end subroutine check_position
                 end interface
                 interface
-                  subroutine B_interp (idx1, idx2, idx3, pos_in, B_out)
+                  subroutine B_interp (idx_in, pos_in, B_out)
                     IMPORT :: num
-                    INTEGER :: idx1, idx2, idx3
+                    INTEGER :: idx_in(9)
                     REAL(num), INTENT(IN) :: pos_in(3)
                     REAL(num), INTENT(OUT) :: B_out(3)
                   end subroutine B_interp
                 end interface
                 interface
-                  subroutine B_gradB_interp (idx1, idx2, idx3, pos_in, B_out, gradB_out)
+                  subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
                     IMPORT :: num
-                    INTEGER :: idx1, idx2, idx3
+                    INTEGER :: idx_in(9)
                     REAL(num), INTENT(IN) :: pos_in(3)
                     REAL(num), INTENT(OUT) :: B_out(3)
                     REAL(num), INTENT(OUT) :: gradB_out(3,3)
@@ -5215,7 +5497,10 @@ module UFiT_Functions_Fortran
         procedure (get_position0), pointer :: gpos_ptr => null ()
         procedure (check_position), pointer :: cpos_ptr => null ()
         procedure (intercept_boundary), pointer :: ibdry_ptr => null ()
+        !B_interp can use B_normalized (before interpolation), or not
         procedure (B_interp), pointer :: binterp_ptr => null ()
+        !Bfull_interp must use B unnormalized
+        procedure (Bfull_interp), pointer :: bfullinterp_ptr => null ()
         procedure (B_gradB_interp), pointer :: bgradinterp_ptr => null ()
         procedure (single_step), pointer :: step_ptr => null ()
         procedure (trace_fl), pointer :: tr_ptr => null ()
@@ -5256,15 +5541,19 @@ module UFiT_Functions_Fortran
 
         if ((grid_regular) .and. (normalized_B)) then
           binterp_ptr => B_interp_normalized_regular
+          bfullinterp_ptr => B_interp_regular
           bgradinterp_ptr => B_gradB_interp_normalized_regular
         else if ((grid_regular) .and. (.not. normalized_B)) then
           binterp_ptr => B_interp_regular
+          bfullinterp_ptr => B_interp_regular
           bgradinterp_ptr => B_gradB_interp_regular
         else if ((.not. grid_regular) .and. (normalized_B)) then
           binterp_ptr => B_interp_normalized_irregular
+          bfullinterp_ptr => B_interp_irregular
           bgradinterp_ptr => B_gradB_interp_normalized_irregular
         else
           binterp_ptr => B_interp_irregular
+          bfullinterp_ptr => B_interp_irregular
           bgradinterp_ptr => B_gradB_interp_irregular
         end if
 
@@ -5376,9 +5665,9 @@ module UFiT_Functions_Fortran
       !$OMP do
         do idx_t = 1, numin_tot
           call gpos_ptr(fieldline_start,idx_t)
-          call tr_ptr(cpos_ptr,ibdry_ptr,binterp_ptr,bgradinterp_ptr,step_ptr,fieldline_start, &
-                      idx_t,fieldline_endpoints, fieldline_Q, fieldline_allpos, fieldline_pts, &
-                      fieldline_ptn, step_size)
+          call tr_ptr(cpos_ptr,ibdry_ptr,binterp_ptr,bfullinterp_ptr,bgradinterp_ptr,step_ptr, &
+                      fieldline_start,idx_t,fieldline_endpoints, fieldline_Q, fieldline_allpos, &
+                      fieldline_pts, fieldline_ptn, step_size)
         end do
       !$OMP end do
       !$OMP end parallel
@@ -5395,6 +5684,18 @@ module UFiT_Functions_Fortran
         IF (ALLOCATED(grid2)) DEALLOCATE(grid2)
         IF (ALLOCATED(grid3)) DEALLOCATE(grid3)
         IF (ALLOCATED(B_grid)) DEALLOCATE(B_grid)
+        IF (ALLOCATED(grid1_1)) DEALLOCATE(grid1_1)
+        IF (ALLOCATED(grid1_2)) DEALLOCATE(grid1_2)
+        IF (ALLOCATED(grid1_3)) DEALLOCATE(grid1_3)
+        IF (ALLOCATED(grid2_1)) DEALLOCATE(grid2_1)
+        IF (ALLOCATED(grid2_2)) DEALLOCATE(grid2_2)
+        IF (ALLOCATED(grid2_3)) DEALLOCATE(grid2_3)
+        IF (ALLOCATED(grid3_1)) DEALLOCATE(grid3_1)
+        IF (ALLOCATED(grid3_2)) DEALLOCATE(grid3_2)
+        IF (ALLOCATED(grid3_3)) DEALLOCATE(grid3_3)
+        IF (ALLOCATED(B_grid1)) DEALLOCATE(B_grid1)
+        IF (ALLOCATED(B_grid2)) DEALLOCATE(B_grid2)
+        IF (ALLOCATED(B_grid3)) DEALLOCATE(B_grid3)
         IF (ALLOCATED(grid1_ir)) DEALLOCATE(grid1_ir)
         IF (ALLOCATED(grid2_ir)) DEALLOCATE(grid2_ir)
         IF (ALLOCATED(grid3_ir)) DEALLOCATE(grid3_ir)
