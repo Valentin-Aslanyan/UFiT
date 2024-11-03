@@ -537,7 +537,7 @@ module UFiT_Functions_Fortran
       subroutine load_Bfield
 
         LOGICAL :: bfile_exists, stop_found
-        INTEGER :: Bfile_type_actual, B_unit, stp_idx
+        INTEGER :: Bfile_type_actual, B_unit, stp_idx, file_size
 
       !Automatically detect file type based on extension
         stop_found = .false.
@@ -580,25 +580,68 @@ module UFiT_Functions_Fortran
       !UFiT unformatted
         if (Bfile_type_actual .eq. 0) then
           grid_regular = .true.
-          inquire(file=B_filename, exist=bfile_exists)
+          inquire(file=B_filename, exist=bfile_exists, SIZE=file_size)
           IF (.not. bfile_exists) THEN
             print *, 'Unable to open B field file'
             print *, 'Attemped to read filename: '
             print *, TRIM(B_filename)
             call EXIT(112)
           END IF
+          IF (file_size .lt. 36) THEN
+            print *, 'B field file is too small'
+            print *, 'Attemped to read filename: '
+            print *, TRIM(B_filename)
+            print *, 'Detected size: ', file_size
+            call EXIT(112)
+          END IF
           open(newunit=B_unit,file=B_filename,access='stream')
-          read(B_unit) sz_1
-          read(B_unit) sz_2
-          read(B_unit) sz_3
-          ALLOCATE(grid1(sz_1))
-          ALLOCATE(grid2(sz_2))
-          ALLOCATE(grid3(sz_3))
-          ALLOCATE(B_grid(3,sz_1,sz_2,sz_3))
-          read(B_unit) grid1
-          read(B_unit) grid2
-          read(B_unit) grid3
-          read(B_unit) B_grid
+          IF (grid_separate) THEN
+            read(B_unit) sz_11
+            read(B_unit) sz_12
+            read(B_unit) sz_13
+            read(B_unit) sz_21
+            read(B_unit) sz_22
+            read(B_unit) sz_23
+            read(B_unit) sz_31
+            read(B_unit) sz_32
+            read(B_unit) sz_33
+            ALLOCATE(grid1_1(sz_11))
+            ALLOCATE(grid1_2(sz_12))
+            ALLOCATE(grid1_3(sz_13))
+            ALLOCATE(grid2_1(sz_21))
+            ALLOCATE(grid2_2(sz_22))
+            ALLOCATE(grid2_3(sz_23))
+            ALLOCATE(grid3_1(sz_31))
+            ALLOCATE(grid3_2(sz_32))
+            ALLOCATE(grid3_3(sz_33))
+            ALLOCATE(B_grid1(sz_11,sz_12,sz_13))
+            ALLOCATE(B_grid2(sz_21,sz_22,sz_23))
+            ALLOCATE(B_grid3(sz_31,sz_32,sz_33))
+            read(B_unit) grid1_1
+            read(B_unit) grid1_2
+            read(B_unit) grid1_3
+            read(B_unit) grid2_1
+            read(B_unit) grid2_2
+            read(B_unit) grid2_3
+            read(B_unit) grid3_1
+            read(B_unit) grid3_2
+            read(B_unit) grid3_3
+            read(B_unit) B_grid1
+            read(B_unit) B_grid2
+            read(B_unit) B_grid3
+          ELSE
+            read(B_unit) sz_1
+            read(B_unit) sz_2
+            read(B_unit) sz_3
+            ALLOCATE(grid1(sz_1))
+            ALLOCATE(grid2(sz_2))
+            ALLOCATE(grid3(sz_3))
+            ALLOCATE(B_grid(3,sz_1,sz_2,sz_3))
+            read(B_unit) grid1
+            read(B_unit) grid2
+            read(B_unit) grid3
+            read(B_unit) B_grid
+          END IF
           close(B_unit)
       !DUMFRIC spherical (3D)
         else if (Bfile_type_actual .eq. 10) then
@@ -607,10 +650,20 @@ module UFiT_Functions_Fortran
       !Lare3d cartesian (3D)
         else if (Bfile_type_actual .eq. 20) then
           grid_regular = .true.
+          IF (grid_separate) THEN
+            print *, 'Separate/staggered grid setting incompatible with Lare3d output file'
+            print *, 'Attempting to use ordinary grid instead'
+            grid_separate = .false.
+          END IF
           call load_Lare3d
       !ARMS flicks, geometry from header (3D)
         else if (Bfile_type_actual .eq. 30) then
           grid_regular = .false.
+          IF (grid_separate) THEN
+            print *, 'Separate/staggered grid setting not yet implemented for ARMS output file'
+            print *, 'Attempting to use ordinary grid instead'
+            grid_separate = .false.
+          END IF
           call load_ARMS
         end if
 
@@ -626,123 +679,130 @@ module UFiT_Functions_Fortran
         REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: B_temp
 
       !Reverse grid to make it increasing everywhere
-        if (grid_regular) then
-          if (grid1(2) .lt. grid1(1)) then
-            ALLOCATE(grid_temp(sz_1))
-            grid_temp(:) = grid1(:)
-            do idx1 = 1, sz_1
-              grid1(idx1) = grid_temp(sz_1+1-idx1)
-            end do
-            DEALLOCATE(grid_temp)
-            ALLOCATE(B_temp(sz_1,sz_2,sz_3))
-            do idx = 1, 3
-              B_temp(:,:,:) = B_grid(idx,:,:,:)
+        if (grid_separate) then
+          if (grid_regular) then
+          else !Grid irregular
+            !TODO
+          end if
+        else !grid not separate
+          if (grid_regular) then
+            if (grid1(2) .lt. grid1(1)) then
+              ALLOCATE(grid_temp(sz_1))
+              grid_temp(:) = grid1(:)
               do idx1 = 1, sz_1
-                B_grid(idx,idx1,:,:) = B_temp(sz_1+1-idx1,:,:)
+                grid1(idx1) = grid_temp(sz_1+1-idx1)
               end do
-            end do
-            DEALLOCATE(B_temp)
-          end if
-          if (grid2(2) .lt. grid2(1)) then
-            ALLOCATE(grid_temp(sz_2))
-            grid_temp(:) = grid2(:)
-            do idx2 = 1, sz_2
-              grid2(idx2) = grid_temp(sz_2+1-idx2)
-            end do
-            DEALLOCATE(grid_temp)
-            ALLOCATE(B_temp(sz_1,sz_2,sz_3))
-            do idx = 1, 3
-              B_temp(:,:,:) = B_grid(idx,:,:,:)
-              do idx2 = 1, sz_2
-                B_grid(idx,:,idx2,:) = B_temp(:,sz_2+1-idx2,:)
-              end do
-            end do
-            DEALLOCATE(B_temp)
-          end if
-          if (grid3(2) .lt. grid3(1)) then
-            ALLOCATE(grid_temp(sz_3))
-            grid_temp(:) = grid3(:)
-            do idx3 = 1, sz_3
-              grid3(idx3) = grid_temp(sz_3+1-idx3)
-            end do
-            DEALLOCATE(grid_temp)
-            ALLOCATE(B_temp(sz_1,sz_2,sz_3))
-            do idx = 1, 3
-              B_temp(:,:,:) = B_grid(idx,:,:,:)
-              do idx3 = 1, sz_3
-                B_grid(idx,:,:,idx3) = B_temp(:,:,sz_3+1-idx3)
-              end do
-            end do
-            DEALLOCATE(B_temp)
-          end if
-
-          grid1min = grid1(1)
-          grid1max = grid1(sz_1)
-          grid2min = grid2(1)
-          grid2max = grid2(sz_2)
-          grid3min = grid3(1)
-          grid3max = grid3(sz_3)
-        else !Grid irregular
-          grid1min = MINVAL(grid1_ir(:,1))
-          grid1max = MAXVAL(grid1_ir(:,1))
-          grid2min = MINVAL(grid2_ir(:,1))
-          grid2max = MAXVAL(grid2_ir(:,1))
-          grid3min = MINVAL(grid3_ir(:,1))
-          grid3max = MAXVAL(grid3_ir(:,1))
-          do idx_b=1,num_blocks
-            if (grid1_ir(2,idx_b) .lt. grid1_ir(1,idx_b)) then
-              ALLOCATE(grid_temp(2))
-              grid_temp(:) = grid1_ir(:,idx_b)
-              grid1_ir(1,idx_b) = grid_temp(2)
-              grid1_ir(2,idx_b) = grid_temp(1)
               DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_1,sz_2,sz_3))
               do idx = 1, 3
-                B_temp(:,:,:) = B_grid_ir(idx,:,:,:,idx_b)
+                B_temp(:,:,:) = B_grid(idx,:,:,:)
                 do idx1 = 1, sz_1
-                  B_grid_ir(idx,idx1,:,:,idx_b) = B_temp(sz_1+1-idx1,:,:)
+                  B_grid(idx,idx1,:,:) = B_temp(sz_1+1-idx1,:,:)
                 end do
               end do
               DEALLOCATE(B_temp)
             end if
-            if (grid2_ir(2,idx_b) .lt. grid2_ir(1,idx_b)) then
-              ALLOCATE(grid_temp(2))
-              grid_temp(:) = grid2_ir(:,idx_b)
-              grid2_ir(1,idx_b) = grid_temp(2)
-              grid2_ir(2,idx_b) = grid_temp(1)
+            if (grid2(2) .lt. grid2(1)) then
+              ALLOCATE(grid_temp(sz_2))
+              grid_temp(:) = grid2(:)
+              do idx2 = 1, sz_2
+                grid2(idx2) = grid_temp(sz_2+1-idx2)
+              end do
               DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_1,sz_2,sz_3))
               do idx = 1, 3
-                B_temp(:,:,:) = B_grid_ir(idx,:,:,:,idx_b)
+                B_temp(:,:,:) = B_grid(idx,:,:,:)
                 do idx2 = 1, sz_2
-                  B_grid_ir(idx,:,idx2,:,idx_b) = B_temp(:,sz_2+1-idx2,:)
+                  B_grid(idx,:,idx2,:) = B_temp(:,sz_2+1-idx2,:)
                 end do
               end do
               DEALLOCATE(B_temp)
             end if
-            if (grid3_ir(2,idx_b) .lt. grid3_ir(1,idx_b)) then
-              ALLOCATE(grid_temp(2))
-              grid_temp(:) = grid3_ir(:,idx_b)
-              grid3_ir(1,idx_b) = grid_temp(2)
-              grid3_ir(2,idx_b) = grid_temp(1)
+            if (grid3(2) .lt. grid3(1)) then
+              ALLOCATE(grid_temp(sz_3))
+              grid_temp(:) = grid3(:)
+              do idx3 = 1, sz_3
+                grid3(idx3) = grid_temp(sz_3+1-idx3)
+              end do
               DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_1,sz_2,sz_3))
               do idx = 1, 3
-                B_temp(:,:,:) = B_grid_ir(idx,:,:,:,idx_b)
+                B_temp(:,:,:) = B_grid(idx,:,:,:)
                 do idx3 = 1, sz_3
-                  B_grid_ir(idx,:,:,idx3,idx_b) = B_temp(:,:,sz_3+1-idx3)
+                  B_grid(idx,:,:,idx3) = B_temp(:,:,sz_3+1-idx3)
                 end do
               end do
               DEALLOCATE(B_temp)
             end if
 
-            grid1min = MIN(grid1min,grid1_ir(1,idx_b))
-            grid1max = MAX(grid1max,grid1_ir(2,idx_b))
-            grid2min = MIN(grid2min,grid2_ir(1,idx_b))
-            grid2max = MAX(grid2max,grid2_ir(2,idx_b))
-            grid3min = MIN(grid3min,grid3_ir(1,idx_b))
-            grid3max = MAX(grid3max,grid3_ir(2,idx_b))
-          end do
+            grid1min = grid1(1)
+            grid1max = grid1(sz_1)
+            grid2min = grid2(1)
+            grid2max = grid2(sz_2)
+            grid3min = grid3(1)
+            grid3max = grid3(sz_3)
+          else !Grid irregular
+            grid1min = MINVAL(grid1_ir(:,1))
+            grid1max = MAXVAL(grid1_ir(:,1))
+            grid2min = MINVAL(grid2_ir(:,1))
+            grid2max = MAXVAL(grid2_ir(:,1))
+            grid3min = MINVAL(grid3_ir(:,1))
+            grid3max = MAXVAL(grid3_ir(:,1))
+            do idx_b=1,num_blocks
+              if (grid1_ir(2,idx_b) .lt. grid1_ir(1,idx_b)) then
+                ALLOCATE(grid_temp(2))
+                grid_temp(:) = grid1_ir(:,idx_b)
+                grid1_ir(1,idx_b) = grid_temp(2)
+                grid1_ir(2,idx_b) = grid_temp(1)
+                DEALLOCATE(grid_temp)
+                ALLOCATE(B_temp(sz_1,sz_2,sz_3))
+                do idx = 1, 3
+                  B_temp(:,:,:) = B_grid_ir(idx,:,:,:,idx_b)
+                  do idx1 = 1, sz_1
+                    B_grid_ir(idx,idx1,:,:,idx_b) = B_temp(sz_1+1-idx1,:,:)
+                  end do
+                end do
+                DEALLOCATE(B_temp)
+              end if
+              if (grid2_ir(2,idx_b) .lt. grid2_ir(1,idx_b)) then
+                ALLOCATE(grid_temp(2))
+                grid_temp(:) = grid2_ir(:,idx_b)
+                grid2_ir(1,idx_b) = grid_temp(2)
+                grid2_ir(2,idx_b) = grid_temp(1)
+                DEALLOCATE(grid_temp)
+                ALLOCATE(B_temp(sz_1,sz_2,sz_3))
+                do idx = 1, 3
+                  B_temp(:,:,:) = B_grid_ir(idx,:,:,:,idx_b)
+                  do idx2 = 1, sz_2
+                    B_grid_ir(idx,:,idx2,:,idx_b) = B_temp(:,sz_2+1-idx2,:)
+                  end do
+                end do
+                DEALLOCATE(B_temp)
+              end if
+              if (grid3_ir(2,idx_b) .lt. grid3_ir(1,idx_b)) then
+                ALLOCATE(grid_temp(2))
+                grid_temp(:) = grid3_ir(:,idx_b)
+                grid3_ir(1,idx_b) = grid_temp(2)
+                grid3_ir(2,idx_b) = grid_temp(1)
+                DEALLOCATE(grid_temp)
+                ALLOCATE(B_temp(sz_1,sz_2,sz_3))
+                do idx = 1, 3
+                  B_temp(:,:,:) = B_grid_ir(idx,:,:,:,idx_b)
+                  do idx3 = 1, sz_3
+                    B_grid_ir(idx,:,:,idx3,idx_b) = B_temp(:,:,sz_3+1-idx3)
+                  end do
+                end do
+                DEALLOCATE(B_temp)
+              end if
+
+              grid1min = MIN(grid1min,grid1_ir(1,idx_b))
+              grid1max = MAX(grid1max,grid1_ir(2,idx_b))
+              grid2min = MIN(grid2min,grid2_ir(1,idx_b))
+              grid2max = MAX(grid2max,grid2_ir(2,idx_b))
+              grid3min = MIN(grid3min,grid3_ir(1,idx_b))
+              grid3max = MAX(grid3max,grid3_ir(2,idx_b))
+            end do
+          end if
         end if
 
         coord_width(1) = grid1max-grid1min
@@ -812,60 +872,128 @@ module UFiT_Functions_Fortran
           print *, TRIM(B_filename)
           call EXIT(115)
         END IF
-        stat_nc = NF90_OPEN(TRIM(B_filename), NF90_NOWRITE, nc_id)
-        stat_nc = NF90_INQ_VARID(nc_id, 'r', var_id)
-        stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1)
-        stat_nc = NF90_INQ_VARID(nc_id, 'th', var_id)
-        stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_2)
-        stat_nc = NF90_INQ_VARID(nc_id, 'ph', var_id)
-        stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_3)
-        ALLOCATE(grid1(sz_1))
-        ALLOCATE(grid2(sz_2))
-        ALLOCATE(grid3(sz_3))
-        ALLOCATE(B_grid(3,sz_1,sz_2,sz_3))
-        stat_nc = NF90_INQ_VARID(nc_id, 'r', var_id)
-        stat_nc = NF90_GET_VAR(nc_id, var_id, grid1)
-        stat_nc = NF90_INQ_VARID(nc_id, 'th', var_id)
-        stat_nc = NF90_GET_VAR(nc_id, var_id, grid2)
-        stat_nc = NF90_INQ_VARID(nc_id, 'ph', var_id)
-        stat_nc = NF90_GET_VAR(nc_id, var_id, grid3)
+        IF (grid_separate) THEN
+          stat_nc = NF90_OPEN(TRIM(B_filename), NF90_NOWRITE, nc_id)
+          stat_nc = NF90_INQ_VARID(nc_id, 'r', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
+          sz_11 = sz_1_temp
+          stat_nc = NF90_INQ_VARID(nc_id, 'rc', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
+          sz_21 = sz_1_temp
+          sz_31 = sz_1_temp
+          stat_nc = NF90_INQ_VARID(nc_id, 'th', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_2_temp)
+          sz_22 = sz_2_temp
+          stat_nc = NF90_INQ_VARID(nc_id, 'thc', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_2_temp)
+          sz_12 = sz_2_temp
+          sz_32 = sz_2_temp
+          stat_nc = NF90_INQ_VARID(nc_id, 'ph', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_3_temp)
+          sz_33 = sz_3_temp
+          stat_nc = NF90_INQ_VARID(nc_id, 'phc', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_3_temp)
+          sz_13 = sz_3_temp
+          sz_23 = sz_3_temp
+          ALLOCATE(grid1_1(sz_11))
+          ALLOCATE(grid1_2(sz_12))
+          ALLOCATE(grid1_3(sz_13))
+          ALLOCATE(grid2_1(sz_21))
+          ALLOCATE(grid2_2(sz_22))
+          ALLOCATE(grid2_3(sz_23))
+          ALLOCATE(grid3_1(sz_31))
+          ALLOCATE(grid3_2(sz_32))
+          ALLOCATE(grid3_3(sz_33))
+          ALLOCATE(B_grid1(sz_11,sz_12,sz_13))
+          ALLOCATE(B_grid2(sz_21,sz_22,sz_23))
+          ALLOCATE(B_grid3(sz_31,sz_32,sz_33))
+
+      !Get grids and B field directly in each dimension
+          stat_nc = NF90_INQ_VARID(nc_id, 'r', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid1_1)
+          stat_nc = NF90_INQ_VARID(nc_id, 'rc', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid1_2)
+          grid1_3(:) = grid1_2(:)
+          stat_nc = NF90_INQ_VARID(nc_id, 'th', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid2_2)
+          stat_nc = NF90_INQ_VARID(nc_id, 'thc', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid2_1)
+          grid2_3(:) = grid2_1(:)
+          stat_nc = NF90_INQ_VARID(nc_id, 'ph', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid3_3)
+          stat_nc = NF90_INQ_VARID(nc_id, 'phc', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid3_1)
+          grid3_2(:) = grid3_1(:)
+          stat_nc = NF90_INQ_VARID(nc_id, 'br', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, B_grid1)
+          stat_nc = NF90_INQ_VARID(nc_id, 'bth', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, B_grid2)
+          stat_nc = NF90_INQ_VARID(nc_id, 'bph', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, B_grid3)
+
+          stat_nc = NF90_CLOSE(nc_id)
+        ELSE
+          stat_nc = NF90_OPEN(TRIM(B_filename), NF90_NOWRITE, nc_id)
+          stat_nc = NF90_INQ_VARID(nc_id, 'r', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1)
+          stat_nc = NF90_INQ_VARID(nc_id, 'th', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_2)
+          stat_nc = NF90_INQ_VARID(nc_id, 'ph', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_3)
+          ALLOCATE(grid1(sz_1))
+          ALLOCATE(grid2(sz_2))
+          ALLOCATE(grid3(sz_3))
+          ALLOCATE(B_grid(3,sz_1,sz_2,sz_3))
+          stat_nc = NF90_INQ_VARID(nc_id, 'r', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid1)
+          stat_nc = NF90_INQ_VARID(nc_id, 'th', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid2)
+          stat_nc = NF90_INQ_VARID(nc_id, 'ph', var_id)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid3)
 
       !Get B field and average 4 vertices in each respective dimension
-        stat_nc = NF90_INQ_VARID(nc_id, 'br', var_id)
-        stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(2), len = sz_2_temp)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(3), len = sz_3_temp)
-        ALLOCATE(B_temp(sz_1_temp, sz_2_temp, sz_3_temp))
-        stat_nc = NF90_GET_VAR(nc_id, var_id, B_temp)
-        B_grid(1,:,:,:) = 0.25_num * (B_temp(:,2:,2:)+B_temp(:,2:,:sz_3_temp-1)+ &
+          stat_nc = NF90_INQ_VARID(nc_id, 'br', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(2), len = sz_2_temp)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(3), len = sz_3_temp)
+          ALLOCATE(B_temp(sz_1_temp, sz_2_temp, sz_3_temp))
+          stat_nc = NF90_GET_VAR(nc_id, var_id, B_temp)
+          B_grid(1,:,:,:) = 0.25_num * (B_temp(:,2:,2:)+B_temp(:,2:,:sz_3_temp-1)+ &
                           B_temp(:,:sz_2_temp-1,2:)+B_temp(:,:sz_2_temp-1,:sz_3_temp-1))
-        DEALLOCATE(B_temp)
-        stat_nc = NF90_INQ_VARID(nc_id, 'bth', var_id)
-        stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(2), len = sz_2_temp)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(3), len = sz_3_temp)
-        ALLOCATE(B_temp(sz_1_temp, sz_2_temp, sz_3_temp))
-        stat_nc = NF90_GET_VAR(nc_id, var_id, B_temp)
-        B_grid(2,:,:,:) = 0.25_num * (B_temp(2:,:,2:)+B_temp(2:,:,:sz_3_temp-1)+ &
+          DEALLOCATE(B_temp)
+          stat_nc = NF90_INQ_VARID(nc_id, 'bth', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(2), len = sz_2_temp)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(3), len = sz_3_temp)
+          ALLOCATE(B_temp(sz_1_temp, sz_2_temp, sz_3_temp))
+          stat_nc = NF90_GET_VAR(nc_id, var_id, B_temp)
+          B_grid(2,:,:,:) = 0.25_num * (B_temp(2:,:,2:)+B_temp(2:,:,:sz_3_temp-1)+ &
                           B_temp(:sz_1_temp-1,:,2:)+B_temp(:sz_1_temp-1,:,:sz_3_temp-1))
-        DEALLOCATE(B_temp)
-        stat_nc = NF90_INQ_VARID(nc_id, 'bph', var_id)
-        stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(2), len = sz_2_temp)
-        stat_nc = nf90_inquire_dimension(nc_id, dimids(3), len = sz_3_temp)
-        ALLOCATE(B_temp(sz_1_temp, sz_2_temp, sz_3_temp))
-        stat_nc = NF90_GET_VAR(nc_id, var_id, B_temp)
-        B_grid(3,:,:,:) = 0.25_num * (B_temp(2:,2:,:)+B_temp(2:,:sz_2_temp-1,:)+ &
+          DEALLOCATE(B_temp)
+          stat_nc = NF90_INQ_VARID(nc_id, 'bph', var_id)
+          stat_nc = nf90_inquire_variable(nc_id, var_id, ndims=ndims, dimids=dimids)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(1), len = sz_1_temp)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(2), len = sz_2_temp)
+          stat_nc = nf90_inquire_dimension(nc_id, dimids(3), len = sz_3_temp)
+          ALLOCATE(B_temp(sz_1_temp, sz_2_temp, sz_3_temp))
+          stat_nc = NF90_GET_VAR(nc_id, var_id, B_temp)
+          B_grid(3,:,:,:) = 0.25_num * (B_temp(2:,2:,:)+B_temp(2:,:sz_2_temp-1,:)+ &
                           B_temp(:sz_1_temp-1,2:,:)+B_temp(:sz_1_temp-1,:sz_2_temp-1,:))
-        DEALLOCATE(B_temp)
+          DEALLOCATE(B_temp)
 
-        stat_nc = NF90_CLOSE(nc_id)
+          stat_nc = NF90_CLOSE(nc_id)
+        END IF
 
 #else
       !Default compilation: NETCDF disabled
@@ -5539,22 +5667,38 @@ module UFiT_Functions_Fortran
           gpos_ptr => get_start_pos_12
         end if
 
-        if ((grid_regular) .and. (normalized_B)) then
-          binterp_ptr => B_interp_normalized_regular
-          bfullinterp_ptr => B_interp_regular
-          bgradinterp_ptr => B_gradB_interp_normalized_regular
-        else if ((grid_regular) .and. (.not. normalized_B)) then
-          binterp_ptr => B_interp_regular
-          bfullinterp_ptr => B_interp_regular
-          bgradinterp_ptr => B_gradB_interp_regular
-        else if ((.not. grid_regular) .and. (normalized_B)) then
-          binterp_ptr => B_interp_normalized_irregular
-          bfullinterp_ptr => B_interp_irregular
-          bgradinterp_ptr => B_gradB_interp_normalized_irregular
+        if (grid_separate) then
+          if (normalized_B) then
+            print *, 'Warning: normalized B (-nb) is incompatible with'
+            print *, 'grid separate (-gs); field will not be normalized'
+          end if
+          if (grid_regular) then
+            binterp_ptr => B_interp_regular_separate
+            bfullinterp_ptr => B_interp_regular_separate
+            bgradinterp_ptr => B_gradB_interp_regular_separate
+          else
+            binterp_ptr => B_interp_irregular
+            bfullinterp_ptr => B_interp_irregular
+            bgradinterp_ptr => B_gradB_interp_irregular
+          end if
         else
-          binterp_ptr => B_interp_irregular
-          bfullinterp_ptr => B_interp_irregular
-          bgradinterp_ptr => B_gradB_interp_irregular
+          if ((grid_regular) .and. (normalized_B)) then
+            binterp_ptr => B_interp_normalized_regular
+            bfullinterp_ptr => B_interp_regular
+            bgradinterp_ptr => B_gradB_interp_normalized_regular
+          else if ((grid_regular) .and. (.not. normalized_B)) then
+            binterp_ptr => B_interp_regular
+            bfullinterp_ptr => B_interp_regular
+            bgradinterp_ptr => B_gradB_interp_regular
+          else if ((.not. grid_regular) .and. (normalized_B)) then
+            binterp_ptr => B_interp_normalized_irregular
+            bfullinterp_ptr => B_interp_irregular
+            bgradinterp_ptr => B_gradB_interp_normalized_irregular
+          else
+            binterp_ptr => B_interp_irregular
+            bfullinterp_ptr => B_interp_irregular
+            bgradinterp_ptr => B_gradB_interp_irregular
+          end if
         end if
 
         if (geometry .eq. 0) then !Cartesian

@@ -22,8 +22,7 @@ module UFiT_Definitions_Fortran
       CHARACTER(len=str_mx) :: B_filename
       CHARACTER(len=str_mx) :: in_filename
       CHARACTER(len=str_mx) :: out_filename
-      LOGICAL :: grid_regular
-      LOGICAL :: grid_separate
+      LOGICAL :: grid_regular, grid_separate
       !Following are seeds of fieldlines
       REAL(num), DIMENSION(:), ALLOCATABLE :: coord1_in  !X for Cartesian, r for spherical
       REAL(num), DIMENSION(:), ALLOCATABLE :: coord2_in  !Y for Cartesian, theta for spherical
