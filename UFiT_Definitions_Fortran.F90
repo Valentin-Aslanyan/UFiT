@@ -65,6 +65,78 @@ module UFiT_Definitions_Fortran
       REAL(num) :: closed_fl_size
       INTEGER :: num_ud_variables
 
+      abstract interface
+        subroutine get_position0_iface (pos_start,idx_in)
+          IMPORT
+          REAL(num) :: pos_start(3)
+          INTEGER :: idx_in
+        end subroutine get_position0_iface
+
+        subroutine check_position_iface (pos_in,pos_out,res)
+          IMPORT
+          REAL(num) :: pos_in(3), pos_out(3)
+          LOGICAL :: res
+        end subroutine check_position_iface
+
+        subroutine intercept_boundary_iface (pos_in,direction,delta_out)
+          IMPORT
+          REAL(num) :: pos_in(3), direction(3), delta_out
+        end subroutine intercept_boundary_iface
+
+        subroutine B_interp_iface (idx_in, pos_in, B_out)
+          IMPORT
+          INTEGER :: idx_in(9)
+          REAL(num), INTENT(IN) :: pos_in(3)
+          REAL(num), INTENT(OUT) :: B_out(3)
+        end subroutine B_interp_iface
+
+        subroutine Bfull_interp_iface (idx_in, pos_in, B_out)
+          IMPORT
+          INTEGER :: idx_in(9)
+          REAL(num), INTENT(IN) :: pos_in(3)
+          REAL(num), INTENT(OUT) :: B_out(3)
+        end subroutine Bfull_interp_iface
+
+        subroutine B_gradB_interp_iface (idx_in, pos_in, B_out, gradB_out)
+          IMPORT
+          INTEGER :: idx_in(9)
+          REAL(num), INTENT(IN) :: pos_in(3)
+          REAL(num), INTENT(OUT) :: B_out(3)
+          REAL(num), INTENT(OUT) :: gradB_out(3,3)
+        end subroutine B_gradB_interp_iface
+
+        subroutine single_step_iface (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
+                                  check_position, B_interp, B_gradB_interp)
+          IMPORT
+          INTEGER :: idx_in(9)
+          REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
+          LOGICAL :: keep_running
+          procedure(check_position_iface) :: check_position
+          procedure(B_interp_iface) :: B_interp
+          procedure(B_gradB_interp_iface) :: B_gradB_interp
+        end subroutine single_step_iface
+
+        subroutine trace_fl_iface (check_position,intercept_boundary,B_interp,Bfull_interp, &
+                                B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
+                                pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+          IMPORT
+          procedure(check_position_iface) :: check_position
+          procedure(intercept_boundary_iface) :: intercept_boundary
+          procedure(B_interp_iface) :: B_interp
+          procedure(Bfull_interp_iface) :: Bfull_interp
+          procedure(B_gradB_interp_iface) :: B_gradB_interp
+          procedure(single_step_iface) :: single_step
+          REAL(num) :: pos_start(3)
+          REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
+          REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
+          REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: pos_fieldline
+          INTEGER :: idx_t
+          INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_start
+          INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
+          REAL(num) :: dl
+        end subroutine trace_fl_iface
+      end interface
+
 
 end module UFiT_Definitions_Fortran
 

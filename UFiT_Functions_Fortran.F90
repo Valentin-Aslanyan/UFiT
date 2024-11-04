@@ -3618,31 +3618,9 @@ module UFiT_Functions_Fortran
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm
 
@@ -3659,27 +3637,14 @@ module UFiT_Functions_Fortran
 
 
       subroutine step_cartesian_RK4(idx_in, pos_in, pos_out, dl, keep_running, &
-                                check_position, B_interp) !TODO - fix and use this
+                                check_position, B_interp, B_gradB_interp) !TODO - fix and use this
 
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),dl
         LOGICAL :: keep_running
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_1in(3), pos_2in(3), pos_3in(3), pos_0out(3), pos_1out(3), dl_norm
         REAL(num) :: pos_2out(3), pos_3out(3), pos_4out(3), k_1(3), k_2(3), k_3(3), k_4(3)
@@ -3724,31 +3689,9 @@ module UFiT_Functions_Fortran
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm
         REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3)
@@ -3782,28 +3725,14 @@ module UFiT_Functions_Fortran
 
 
       subroutine step_cartesianQ_RK4(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
-                                 keep_running, check_position, B_gradB_interp) !TODO - fix and use this
+                                 keep_running, check_position, B_interp, B_gradB_interp) !TODO - fix and use this
 
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, dl_norm
         REAL(num) :: pos_1in(3), pos_2in(3), pos_3in(3), pos_0out(3), pos_1out(3), pos_2out(3)
@@ -3890,78 +3819,12 @@ module UFiT_Functions_Fortran
                                  pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace fieldlines, keep only endpoints
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4046,78 +3909,12 @@ module UFiT_Functions_Fortran
                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and keep full fieldline locations
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4207,78 +4004,12 @@ module UFiT_Functions_Fortran
                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and calculate Q
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4401,78 +4132,12 @@ module UFiT_Functions_Fortran
                                     pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace, calculate Q and keep full fieldline locations
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4601,31 +4266,9 @@ module UFiT_Functions_Fortran
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm, r_sin_th
 
@@ -4652,31 +4295,9 @@ module UFiT_Functions_Fortran
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm
         REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3), r_sin_th, cot_th
@@ -4754,31 +4375,9 @@ module UFiT_Functions_Fortran
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm
         REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3), r_sin_th, cot_th
@@ -4825,78 +4424,12 @@ module UFiT_Functions_Fortran
                                  pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace fieldlines, keep only endpoints
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4981,78 +4514,12 @@ module UFiT_Functions_Fortran
                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and keep full fieldline locations
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -5146,78 +4613,12 @@ module UFiT_Functions_Fortran
                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace and calculate Q
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -5340,78 +4741,12 @@ module UFiT_Functions_Fortran
                                     pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
       !Trace, calculate Q and keep full fieldline locations
 
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
+        procedure(check_position_iface) :: check_position
+        procedure(intercept_boundary_iface) :: intercept_boundary
+        procedure(B_interp_iface) :: B_interp
+        procedure(Bfull_interp_iface) :: Bfull_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+        procedure(single_step_iface) :: single_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -5543,188 +4878,16 @@ module UFiT_Functions_Fortran
         INTEGER :: idx_t
         REAL(num) :: fieldline_start(3)
 
-        interface
-          subroutine get_position0 (pos_start,idx_in)
-            IMPORT :: num
-            REAL(num) :: pos_start(3)
-            INTEGER :: idx_in
-          end subroutine get_position0
-        end interface
-
-        interface
-          subroutine check_position (pos_in,pos_out,res)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), pos_out(3)
-            LOGICAL :: res
-          end subroutine check_position
-        end interface
-
-        interface
-          subroutine intercept_boundary (pos_in,direction,delta_out)
-            IMPORT :: num
-            REAL(num) :: pos_in(3), direction(3), delta_out
-          end subroutine intercept_boundary
-        end interface
-
-        interface
-          subroutine B_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine B_interp
-        end interface
-
-        interface
-          subroutine Bfull_interp (idx_in, pos_in, B_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-          end subroutine Bfull_interp
-        end interface
-
-        interface
-          subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num), INTENT(IN) :: pos_in(3)
-            REAL(num), INTENT(OUT) :: B_out(3)
-            REAL(num), INTENT(OUT) :: gradB_out(3,3)
-          end subroutine B_gradB_interp
-        end interface
-
-        interface
-          subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
-            IMPORT :: num
-            INTEGER :: idx_in(9)
-            REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-            LOGICAL :: keep_running
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-          end subroutine single_step
-        end interface
-
-        interface
-          subroutine trace_fl (check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
-            IMPORT :: num, MAX_STEPS
-            interface
-              subroutine check_position (pos_in,pos_out,res)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), pos_out(3)
-                LOGICAL :: res
-              end subroutine check_position
-            end interface
-            interface
-              subroutine intercept_boundary (pos_in,direction,delta_out)
-                IMPORT :: num
-                REAL(num) :: pos_in(3), direction(3), delta_out
-              end subroutine intercept_boundary
-            end interface
-            interface
-              subroutine B_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine B_interp
-            end interface
-            interface
-              subroutine Bfull_interp (idx_in, pos_in, B_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-              end subroutine Bfull_interp
-            end interface
-            interface
-              subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num), INTENT(IN) :: pos_in(3)
-                REAL(num), INTENT(OUT) :: B_out(3)
-                REAL(num), INTENT(OUT) :: gradB_out(3,3)
-              end subroutine B_gradB_interp
-            end interface
-            interface
-              subroutine single_step (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                      check_position, B_interp, B_gradB_interp)
-                IMPORT :: num
-                INTEGER :: idx_in(9)
-                REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
-                LOGICAL :: keep_running
-                interface
-                  subroutine check_position (pos_in,pos_out,res)
-                    IMPORT :: num
-                    REAL(num) :: pos_in(3), pos_out(3)
-                    LOGICAL :: res
-                  end subroutine check_position
-                end interface
-                interface
-                  subroutine B_interp (idx_in, pos_in, B_out)
-                    IMPORT :: num
-                    INTEGER :: idx_in(9)
-                    REAL(num), INTENT(IN) :: pos_in(3)
-                    REAL(num), INTENT(OUT) :: B_out(3)
-                  end subroutine B_interp
-                end interface
-                interface
-                  subroutine B_gradB_interp (idx_in, pos_in, B_out, gradB_out)
-                    IMPORT :: num
-                    INTEGER :: idx_in(9)
-                    REAL(num), INTENT(IN) :: pos_in(3)
-                    REAL(num), INTENT(OUT) :: B_out(3)
-                    REAL(num), INTENT(OUT) :: gradB_out(3,3)
-                  end subroutine B_gradB_interp
-                end interface
-              end subroutine single_step
-            end interface
-            REAL(num) :: pos_start(3)
-            REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
-            REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
-            REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: pos_fieldline
-            INTEGER :: idx_t
-            INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_start
-            INTEGER, DIMENSION(:), ALLOCATABLE :: pos_step_total
-            REAL(num) :: dl
-          end subroutine trace_fl
-        end interface
-
-        procedure (get_position0), pointer :: gpos_ptr => null ()
-        procedure (check_position), pointer :: cpos_ptr => null ()
-        procedure (intercept_boundary), pointer :: ibdry_ptr => null ()
+        procedure (get_position0_iface), pointer :: gpos_ptr => null ()
+        procedure (check_position_iface), pointer :: cpos_ptr => null ()
+        procedure (intercept_boundary_iface), pointer :: ibdry_ptr => null ()
         !B_interp can use B_normalized (before interpolation), or not
-        procedure (B_interp), pointer :: binterp_ptr => null ()
+        procedure (B_interp_iface), pointer :: binterp_ptr => null ()
         !Bfull_interp must use B unnormalized
-        procedure (Bfull_interp), pointer :: bfullinterp_ptr => null ()
-        procedure (B_gradB_interp), pointer :: bgradinterp_ptr => null ()
-        procedure (single_step), pointer :: step_ptr => null ()
-        procedure (trace_fl), pointer :: tr_ptr => null ()
+        procedure (Bfull_interp_iface), pointer :: bfullinterp_ptr => null ()
+        procedure (B_gradB_interp_iface), pointer :: bgradinterp_ptr => null ()
+        procedure (single_step_iface), pointer :: step_ptr => null ()
+        procedure (trace_fl_iface), pointer :: tr_ptr => null ()
 
         if (user_defined) then
           save_endpoints = .false.
