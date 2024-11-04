@@ -99,6 +99,7 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.Bfile_type=-1
 		self.input_type=1
 		self.grid_regular=True
+		self.grid_separate=False
 		self.periodic_X=False
 		self.periodic_Y=False
 		self.periodic_Z=False
@@ -137,6 +138,27 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.grid2_ir=np.zeros((2,1),dtype="double")
 		self.grid3_ir=np.zeros((2,1),dtype="double")
 		self.B_grid_ir=np.zeros((3,2,2,2,1),dtype="double")
+		self.sz11=2
+		self.sz12=2
+		self.sz13=2
+		self.sz21=2
+		self.sz22=2
+		self.sz23=2
+		self.sz31=2
+		self.sz32=2
+		self.sz33=2
+		self.grid1_1=np.zeros((2),dtype="double")
+		self.grid1_2=np.zeros((2),dtype="double")
+		self.grid1_3=np.zeros((2),dtype="double")
+		self.grid2_1=np.zeros((2),dtype="double")
+		self.grid2_2=np.zeros((2),dtype="double")
+		self.grid2_3=np.zeros((2),dtype="double")
+		self.grid3_1=np.zeros((2),dtype="double")
+		self.grid3_2=np.zeros((2),dtype="double")
+		self.grid3_3=np.zeros((2),dtype="double")
+		self.B_grid1=np.zeros((2,2,2),dtype="double")
+		self.B_grid2=np.zeros((2,2,2),dtype="double")
+		self.B_grid3=np.zeros((2,2,2),dtype="double")
 		self.write_output = False
 		self.return_output = False
 		self.endpoints = np.zeros((6,2),dtype="double")
@@ -180,6 +202,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 				ctypes.c_int, 
 				ctypes.c_int, 
 				ctypes.c_int, 
+				ctypes.c_int, 
 				ctypes.c_double, 
 				type(b'A'), 
 				type(b'A'), 
@@ -205,6 +228,27 @@ def call_UFiT(shared_lib_path,UFiT_input):
 				ctypes.POINTER(ctypes.c_double), 
 				ctypes.c_int, 
 				ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.c_int, 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.POINTER(ctypes.c_double), 
+				ctypes.c_int, 
+				ctypes.c_int, 
 				ctypes.POINTER(ctypes.c_double), 
 				ctypes.POINTER(ctypes.c_double), 
 				ctypes.POINTER(ctypes.c_int), 
@@ -215,14 +259,29 @@ def call_UFiT(shared_lib_path,UFiT_input):
 				]
 
 	if UFiT_input.grid_regular==True or UFiT_input.grid_regular==1:
-		UFiT_input.sz1=len(UFiT_input.grid1)
-		UFiT_input.sz2=len(UFiT_input.grid2)
-		UFiT_input.sz3=len(UFiT_input.grid3)
+		if UFiT_input.grid_separate==True or UFiT_input.grid_separate==1:
+			UFiT_input.sz11=len(UFiT_input.grid1_1)
+			UFiT_input.sz12=len(UFiT_input.grid1_2)
+			UFiT_input.sz13=len(UFiT_input.grid1_3)
+			UFiT_input.sz21=len(UFiT_input.grid2_1)
+			UFiT_input.sz22=len(UFiT_input.grid2_2)
+			UFiT_input.sz23=len(UFiT_input.grid2_3)
+			UFiT_input.sz31=len(UFiT_input.grid3_1)
+			UFiT_input.sz32=len(UFiT_input.grid3_2)
+			UFiT_input.sz33=len(UFiT_input.grid3_3)
+		else:
+			UFiT_input.sz1=len(UFiT_input.grid1)
+			UFiT_input.sz2=len(UFiT_input.grid2)
+			UFiT_input.sz3=len(UFiT_input.grid3)
 	else:
-		UFiT_input.num_blocks=np.shape(UFiT_input.B_grid_ir)[4]
-		UFiT_input.sz1=np.shape(UFiT_input.B_grid_ir)[1]
-		UFiT_input.sz2=np.shape(UFiT_input.B_grid_ir)[2]
-		UFiT_input.sz3=np.shape(UFiT_input.B_grid_ir)[3]
+		if UFiT_input.grid_separate==True or UFiT_input.grid_separate==1:
+			print("Irregular and separate grids incompatible - for now")
+			return UFiT_input
+		else:
+			UFiT_input.num_blocks=np.shape(UFiT_input.B_grid_ir)[4]
+			UFiT_input.sz1=np.shape(UFiT_input.B_grid_ir)[1]
+			UFiT_input.sz2=np.shape(UFiT_input.B_grid_ir)[2]
+			UFiT_input.sz3=np.shape(UFiT_input.B_grid_ir)[3]
 
 	UFiT_input.coord1=np.array(UFiT_input.coord1,dtype="double")
 	UFiT_input.coord2=np.array(UFiT_input.coord2,dtype="double")
@@ -235,6 +294,18 @@ def call_UFiT(shared_lib_path,UFiT_input):
 	UFiT_input.grid2_ir=np.array(UFiT_input.grid2_ir,dtype="double")
 	UFiT_input.grid3_ir=np.array(UFiT_input.grid3_ir,dtype="double")
 	UFiT_input.B_grid_ir=np.array(UFiT_input.B_grid_ir,dtype="double")
+	UFiT_input.grid1_1=np.array(UFiT_input.grid1_1,dtype="double")
+	UFiT_input.grid1_2=np.array(UFiT_input.grid1_2,dtype="double")
+	UFiT_input.grid1_3=np.array(UFiT_input.grid1_3,dtype="double")
+	UFiT_input.grid2_1=np.array(UFiT_input.grid2_1,dtype="double")
+	UFiT_input.grid2_2=np.array(UFiT_input.grid2_2,dtype="double")
+	UFiT_input.grid2_3=np.array(UFiT_input.grid2_3,dtype="double")
+	UFiT_input.grid3_1=np.array(UFiT_input.grid3_1,dtype="double")
+	UFiT_input.grid3_2=np.array(UFiT_input.grid3_2,dtype="double")
+	UFiT_input.grid3_3=np.array(UFiT_input.grid3_3,dtype="double")
+	UFiT_input.B_grid1=np.array(UFiT_input.B_grid1,dtype="double")
+	UFiT_input.B_grid2=np.array(UFiT_input.B_grid2,dtype="double")
+	UFiT_input.B_grid3=np.array(UFiT_input.B_grid3,dtype="double")
 	if UFiT_input.input_type==0:
 		UFiT_input.numin_tot=min(len(UFiT_input.coord1),len(UFiT_input.coord2),len(UFiT_input.coord3))
 		UFiT_input.numin1=UFiT_input.numin_tot
@@ -262,6 +333,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 					ctypes.c_int(UFiT_input.Bfile_type), 
 					ctypes.c_int(UFiT_input.input_type), 
 					ctypes.c_int(bool_to_int(UFiT_input.grid_regular)), 
+					ctypes.c_int(bool_to_int(UFiT_input.grid_separate)), 
 					ctypes.c_int(bool_to_int(UFiT_input.periodic_X)), 
 					ctypes.c_int(bool_to_int(UFiT_input.periodic_Y)), 
 					ctypes.c_int(bool_to_int(UFiT_input.periodic_Z)), 
@@ -300,6 +372,27 @@ def call_UFiT(shared_lib_path,UFiT_input):
 					np.ascontiguousarray(UFiT_input.grid2_ir.transpose(1,0)).ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					np.ascontiguousarray(UFiT_input.grid3_ir.transpose(1,0)).ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					np.ascontiguousarray(UFiT_input.B_grid_ir.transpose(4,3,2,1,0)).ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					ctypes.c_int(UFiT_input.sz11), 
+					ctypes.c_int(UFiT_input.sz12), 
+					ctypes.c_int(UFiT_input.sz13), 
+					ctypes.c_int(UFiT_input.sz21), 
+					ctypes.c_int(UFiT_input.sz22), 
+					ctypes.c_int(UFiT_input.sz23), 
+					ctypes.c_int(UFiT_input.sz31), 
+					ctypes.c_int(UFiT_input.sz32), 
+					ctypes.c_int(UFiT_input.sz33), 
+					UFiT_input.grid1_1.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid1_2.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid1_3.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid2_1.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid2_2.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid2_3.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid3_1.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid3_2.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					UFiT_input.grid3_3.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					np.ascontiguousarray(UFiT_input.B_grid1.transpose(2,1,0)).ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					np.ascontiguousarray(UFiT_input.B_grid2.transpose(2,1,0)).ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					np.ascontiguousarray(UFiT_input.B_grid3.transpose(2,1,0)).ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					ctypes.c_int(bool_to_int(UFiT_input.write_output)), 
 					ctypes.c_int(bool_to_int(UFiT_input.return_output)),
 					UFiT_input.endpoints.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 

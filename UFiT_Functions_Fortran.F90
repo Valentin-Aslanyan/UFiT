@@ -681,6 +681,99 @@ module UFiT_Functions_Fortran
       !Reverse grid to make it increasing everywhere
         if (grid_separate) then
           if (grid_regular) then
+          !Reverse B_grid1 and related coordinates
+            if (grid1_1(2) .lt. grid1_1(1)) then
+              ALLOCATE(grid_temp(sz_11))
+              grid_temp(:) = grid1_1(:)
+              do idx1 = 1, sz_11
+                grid1_1(idx1) = grid_temp(sz_11+1-idx1)
+              end do
+              DEALLOCATE(grid_temp)
+              ALLOCATE(B_temp(sz_11,sz_12,sz_13))
+              B_temp(:,:,:) = B_grid1(:,:,:)
+              do idx1 = 1, sz_11
+                B_grid1(idx1,:,:) = B_temp(sz_11+1-idx1,:,:)
+              end do
+              DEALLOCATE(B_temp)
+            end if
+            if (grid1_2(2) .lt. grid1_2(1)) then
+              ALLOCATE(grid_temp(sz_12))
+              grid_temp(:) = grid1_2(:)
+              do idx2 = 1, sz_12
+                grid1_2(idx2) = grid_temp(sz_12+1-idx2)
+              end do
+              DEALLOCATE(grid_temp)
+              ALLOCATE(B_temp(sz_11,sz_12,sz_13))
+              B_temp(:,:,:) = B_grid1(:,:,:)
+              do idx2 = 1, sz_12
+                B_grid1(:,idx2,:) = B_temp(:,sz_12+1-idx2,:)
+              end do
+              DEALLOCATE(B_temp)
+            end if
+            if (grid1_3(2) .lt. grid1_3(1)) then
+              ALLOCATE(grid_temp(sz_13))
+              grid_temp(:) = grid1_3(:)
+              do idx3 = 1, sz_13
+                grid1_3(idx3) = grid_temp(sz_13+1-idx3)
+              end do
+              DEALLOCATE(grid_temp)
+              ALLOCATE(B_temp(sz_11,sz_12,sz_13))
+              B_temp(:,:,:) = B_grid1(:,:,:)
+              do idx3 = 1, sz_13
+                B_grid1(:,:,idx3) = B_temp(:,:,sz_13+1-idx3)
+              end do
+              DEALLOCATE(B_temp)
+            end if
+          !Reverse B_grid2 and related coordinates
+            if (grid2_1(2) .lt. grid2_1(1)) then
+              ALLOCATE(grid_temp(sz_21))
+              grid_temp(:) = grid2_1(:)
+              do idx1 = 1, sz_21
+                grid2_1(idx1) = grid_temp(sz_21+1-idx1)
+              end do
+              DEALLOCATE(grid_temp)
+              ALLOCATE(B_temp(sz_21,sz_22,sz_23))
+              B_temp(:,:,:) = B_grid2(:,:,:)
+              do idx1 = 1, sz_21
+                B_grid2(idx1,:,:) = B_temp(sz_21+1-idx1,:,:)
+              end do
+              DEALLOCATE(B_temp)
+            end if
+            if (grid2_2(2) .lt. grid2_2(1)) then
+              ALLOCATE(grid_temp(sz_22))
+              grid_temp(:) = grid2_2(:)
+              do idx2 = 1, sz_22
+                grid2_2(idx2) = grid_temp(sz_22+1-idx2)
+              end do
+              DEALLOCATE(grid_temp)
+              ALLOCATE(B_temp(sz_21,sz_22,sz_23))
+              B_temp(:,:,:) = B_grid2(:,:,:)
+              do idx2 = 1, sz_22
+                B_grid2(:,idx2,:) = B_temp(:,sz_22+1-idx2,:)
+              end do
+              DEALLOCATE(B_temp)
+            end if
+            if (grid3_3(2) .lt. grid3_3(1)) then
+              ALLOCATE(grid_temp(sz_33))
+              grid_temp(:) = grid3_3(:)
+              do idx3 = 1, sz_33
+                grid3_3(idx3) = grid_temp(sz_33+1-idx3)
+              end do
+              DEALLOCATE(grid_temp)
+              ALLOCATE(B_temp(sz_31,sz_32,sz_33))
+              B_temp(:,:,:) = B_grid3(:,:,:)
+              do idx3 = 1, sz_33
+                B_grid3(:,:,idx3) = B_temp(:,:,sz_33+1-idx3)
+              end do
+              DEALLOCATE(B_temp)
+            end if
+
+            grid1min = MAX(grid1_1(1),grid2_1(1),grid3_1(1))
+            grid1max = MIN(grid1_1(sz_11),grid2_1(sz_21),grid3_1(sz_31))
+            grid2min = MAX(grid1_2(1),grid2_2(1),grid3_2(1))
+            grid2max = MIN(grid1_2(sz_12),grid2_2(sz_22),grid3_2(sz_32))
+            grid3min = MAX(grid1_3(1),grid2_3(1),grid3_3(1))
+            grid3max = MIN(grid1_3(sz_13),grid2_3(sz_23),grid3_3(sz_33))
           else !Grid irregular
             !TODO
           end if
