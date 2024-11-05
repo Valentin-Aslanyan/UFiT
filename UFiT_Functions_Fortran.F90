@@ -684,87 +684,112 @@ module UFiT_Functions_Fortran
           !Reverse B_grid1 and related coordinates
             if (grid1_1(2) .lt. grid1_1(1)) then
               ALLOCATE(grid_temp(sz_11))
-              grid_temp(:) = grid1_1(:)
-              do idx1 = 1, sz_11
-                grid1_1(idx1) = grid_temp(sz_11+1-idx1)
-              end do
-              DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_11,sz_12,sz_13))
+              grid_temp(:) = grid1_1(:)
               B_temp(:,:,:) = B_grid1(:,:,:)
               do idx1 = 1, sz_11
+                grid1_1(idx1) = grid_temp(sz_11+1-idx1)
                 B_grid1(idx1,:,:) = B_temp(sz_11+1-idx1,:,:)
               end do
+              DEALLOCATE(grid_temp)
               DEALLOCATE(B_temp)
             end if
             if (grid1_2(2) .lt. grid1_2(1)) then
               ALLOCATE(grid_temp(sz_12))
-              grid_temp(:) = grid1_2(:)
-              do idx2 = 1, sz_12
-                grid1_2(idx2) = grid_temp(sz_12+1-idx2)
-              end do
-              DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_11,sz_12,sz_13))
+              grid_temp(:) = grid1_2(:)
               B_temp(:,:,:) = B_grid1(:,:,:)
               do idx2 = 1, sz_12
+                grid1_2(idx2) = grid_temp(sz_12+1-idx2)
                 B_grid1(:,idx2,:) = B_temp(:,sz_12+1-idx2,:)
               end do
+              DEALLOCATE(grid_temp)
               DEALLOCATE(B_temp)
             end if
             if (grid1_3(2) .lt. grid1_3(1)) then
               ALLOCATE(grid_temp(sz_13))
-              grid_temp(:) = grid1_3(:)
-              do idx3 = 1, sz_13
-                grid1_3(idx3) = grid_temp(sz_13+1-idx3)
-              end do
-              DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_11,sz_12,sz_13))
+              grid_temp(:) = grid1_3(:)
               B_temp(:,:,:) = B_grid1(:,:,:)
               do idx3 = 1, sz_13
+                grid1_3(idx3) = grid_temp(sz_13+1-idx3)
                 B_grid1(:,:,idx3) = B_temp(:,:,sz_13+1-idx3)
               end do
+              DEALLOCATE(grid_temp)
               DEALLOCATE(B_temp)
             end if
           !Reverse B_grid2 and related coordinates
             if (grid2_1(2) .lt. grid2_1(1)) then
               ALLOCATE(grid_temp(sz_21))
-              grid_temp(:) = grid2_1(:)
-              do idx1 = 1, sz_21
-                grid2_1(idx1) = grid_temp(sz_21+1-idx1)
-              end do
-              DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_21,sz_22,sz_23))
+              grid_temp(:) = grid2_1(:)
               B_temp(:,:,:) = B_grid2(:,:,:)
               do idx1 = 1, sz_21
+                grid2_1(idx1) = grid_temp(sz_21+1-idx1)
                 B_grid2(idx1,:,:) = B_temp(sz_21+1-idx1,:,:)
               end do
+              DEALLOCATE(grid_temp)
               DEALLOCATE(B_temp)
             end if
             if (grid2_2(2) .lt. grid2_2(1)) then
               ALLOCATE(grid_temp(sz_22))
-              grid_temp(:) = grid2_2(:)
-              do idx2 = 1, sz_22
-                grid2_2(idx2) = grid_temp(sz_22+1-idx2)
-              end do
-              DEALLOCATE(grid_temp)
               ALLOCATE(B_temp(sz_21,sz_22,sz_23))
+              grid_temp(:) = grid2_2(:)
               B_temp(:,:,:) = B_grid2(:,:,:)
               do idx2 = 1, sz_22
+                grid2_2(idx2) = grid_temp(sz_22+1-idx2)
                 B_grid2(:,idx2,:) = B_temp(:,sz_22+1-idx2,:)
               end do
+              DEALLOCATE(grid_temp)
               DEALLOCATE(B_temp)
             end if
-            if (grid3_3(2) .lt. grid3_3(1)) then
-              ALLOCATE(grid_temp(sz_33))
-              grid_temp(:) = grid3_3(:)
-              do idx3 = 1, sz_33
-                grid3_3(idx3) = grid_temp(sz_33+1-idx3)
+            if (grid2_3(2) .lt. grid2_3(1)) then
+              ALLOCATE(grid_temp(sz_23))
+              ALLOCATE(B_temp(sz_21,sz_22,sz_23))
+              grid_temp(:) = grid2_3(:)
+              B_temp(:,:,:) = B_grid2(:,:,:)
+              do idx3 = 1, sz_23
+                grid2_3(idx3) = grid_temp(sz_23+1-idx3)
+                B_grid2(:,:,idx3) = B_temp(:,:,sz_23+1-idx3)
               end do
               DEALLOCATE(grid_temp)
+              DEALLOCATE(B_temp)
+            end if
+          !Reverse B_grid3 and related coordinates
+            if (grid3_1(2) .lt. grid3_1(1)) then
+              ALLOCATE(grid_temp(sz_31))
               ALLOCATE(B_temp(sz_31,sz_32,sz_33))
+              grid_temp(:) = grid3_1(:)
+              B_temp(:,:,:) = B_grid3(:,:,:)
+              do idx1 = 1, sz_31
+                grid3_1(idx1) = grid_temp(sz_31+1-idx1)
+                B_grid3(idx1,:,:) = B_temp(sz_31+1-idx1,:,:)
+              end do
+              DEALLOCATE(grid_temp)
+              DEALLOCATE(B_temp)
+            end if
+            if (grid3_2(2) .lt. grid3_2(1)) then
+              ALLOCATE(grid_temp(sz_32))
+              ALLOCATE(B_temp(sz_31,sz_32,sz_33))
+              grid_temp(:) = grid3_2(:)
+              B_temp(:,:,:) = B_grid3(:,:,:)
+              do idx2 = 1, sz_32
+                grid3_2(idx2) = grid_temp(sz_32+1-idx2)
+                B_grid3(:,idx2,:) = B_temp(:,sz_32+1-idx2,:)
+              end do
+              DEALLOCATE(grid_temp)
+              DEALLOCATE(B_temp)
+            end if
+            if (grid2_3(2) .lt. grid2_3(1)) then
+              ALLOCATE(grid_temp(sz_33))
+              ALLOCATE(B_temp(sz_31,sz_32,sz_33))
+              grid_temp(:) = grid3_3(:)
               B_temp(:,:,:) = B_grid3(:,:,:)
               do idx3 = 1, sz_33
+                grid3_3(idx3) = grid_temp(sz_33+1-idx3)
                 B_grid3(:,:,idx3) = B_temp(:,:,sz_33+1-idx3)
               end do
+              DEALLOCATE(grid_temp)
               DEALLOCATE(B_temp)
             end if
 
@@ -1011,18 +1036,18 @@ module UFiT_Functions_Fortran
           stat_nc = NF90_INQ_VARID(nc_id, 'r', var_id)
           stat_nc = NF90_GET_VAR(nc_id, var_id, grid1_1)
           stat_nc = NF90_INQ_VARID(nc_id, 'rc', var_id)
-          stat_nc = NF90_GET_VAR(nc_id, var_id, grid1_2)
-          grid1_3(:) = grid1_2(:)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid2_1)
+          grid3_1(:) = grid2_1(:)
           stat_nc = NF90_INQ_VARID(nc_id, 'th', var_id)
           stat_nc = NF90_GET_VAR(nc_id, var_id, grid2_2)
           stat_nc = NF90_INQ_VARID(nc_id, 'thc', var_id)
-          stat_nc = NF90_GET_VAR(nc_id, var_id, grid2_1)
-          grid2_3(:) = grid2_1(:)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid1_2)
+          grid3_2(:) = grid1_2(:)
           stat_nc = NF90_INQ_VARID(nc_id, 'ph', var_id)
           stat_nc = NF90_GET_VAR(nc_id, var_id, grid3_3)
           stat_nc = NF90_INQ_VARID(nc_id, 'phc', var_id)
-          stat_nc = NF90_GET_VAR(nc_id, var_id, grid3_1)
-          grid3_2(:) = grid3_1(:)
+          stat_nc = NF90_GET_VAR(nc_id, var_id, grid1_3)
+          grid2_3(:) = grid1_3(:)
           stat_nc = NF90_INQ_VARID(nc_id, 'br', var_id)
           stat_nc = NF90_GET_VAR(nc_id, var_id, B_grid1)
           stat_nc = NF90_INQ_VARID(nc_id, 'bth', var_id)
