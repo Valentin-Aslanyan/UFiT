@@ -59,11 +59,11 @@ class UFiT_flf_output:	#fieldline file, reading result of UFiT
 		elif slice_index==None:
 			print("Specify slice index")
 			return np.zeros((1)),np.zeros((1)),np.zeros((1,1))
-		elif slice_dim==0 or slice_dim.lower()=='x' or slice_dim.lower()=='r':
+		elif slice_dim == 0 or (isinstance(slice_dim, str) and (slice_dim.lower() == 'x' or slice_dim.lower() == 'r')):
 			return self.coord2, self.coord3, self.Q_out.reshape(self.numin3,self.numin2,self.numin1)[:,:,slice_index]
-		elif slice_dim==1 or slice_dim.lower()=='y' or slice_dim.lower()[0]=='t':
+		elif slice_dim == 1 or (isinstance(slice_dim, str) and (slice_dim.lower() == 'y' or slice_dim.lower()[0] == 't')):
 			return self.coord1, self.coord3, self.Q_out.reshape(self.numin3,self.numin2,self.numin1)[:,slice_index,:]
-		elif slice_dim==2 or slice_dim.lower()=='z' or slice_dim.lower()[0]=='p':
+		elif slice_dim == 2 or (isinstance(slice_dim, str) and (slice_dim.lower() == 'z' or slice_dim.lower()[0] == 'p')):
 			return self.coord1, self.coord2, self.Q_out.reshape(self.numin3,self.numin2,self.numin1)[slice_index,:,:]
 		else:
 			print("slice_dim or slice_index incorrect")
@@ -574,11 +574,11 @@ def get_Q_2D(flf_output,slice_dim=None,slice_index=None):
 	elif slice_index==None:
 		print("Specify slice index")
 		return np.zeros((1)),np.zeros((1)),np.zeros((1,1))
-	elif slice_dim==0 or slice_dim.lower()=='x' or slice_dim.lower()=='r':
+	elif slice_dim == 0 or (isinstance(slice_dim, str) and (slice_dim.lower() == 'x' or slice_dim.lower() == 'r')):
 		return flf_output.coord2, flf_output.coord3, flf_output.Q_out.reshape(flf_output.numin3,flf_output.numin2,flf_output.numin1)[:,:,slice_index]
-	elif slice_dim==1 or slice_dim.lower()=='y' or slice_dim.lower()[0]=='t':
+	elif slice_dim == 1 or (isinstance(slice_dim, str) and (slice_dim.lower() == 'y' or slice_dim.lower()[0] == 't')):
 		return flf_output.coord1, flf_output.coord3, flf_output.Q_out.reshape(flf_output.numin3,flf_output.numin2,flf_output.numin1)[:,slice_index,:]
-	elif slice_dim==2 or slice_dim.lower()=='z' or slice_dim.lower()[0]=='p':
+	elif slice_dim == 2 or (isinstance(slice_dim, str) and (slice_dim.lower() == 'z' or slice_dim.lower()[0] == 'p')):
 		return flf_output.coord1, flf_output.coord2, flf_output.Q_out.reshape(flf_output.numin3,flf_output.numin2,flf_output.numin1)[slice_index,:,:]
 	else:
 		print("slice_dim or slice_index incorrect")
