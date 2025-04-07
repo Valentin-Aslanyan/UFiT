@@ -9,7 +9,9 @@
 module UFiT_Functions_Fortran
       USE UFiT_Definitions_Fortran
       USE UFiT_User_Functions
+#ifdef _OPENMP
       USE OMP_LIB
+#endif
 #ifdef USE_NC
       USE netcdf
 #endif
@@ -358,6 +360,8 @@ module UFiT_Functions_Fortran
       subroutine get_available_resource
       !Find the number of CPUs/GPUs
 
+#ifdef _OPENMP
+      !OpenMP for parallelism
         IF (print_devices) THEN
           print *, "Number of CPUs available: ", OMP_GET_MAX_THREADS()
         END IF
@@ -367,6 +371,10 @@ module UFiT_Functions_Fortran
         ELSE IF (num_proc .lt. 1) THEN
           num_proc = 1
         END IF
+#else
+      !OpenMP not detected
+        num_proc = 1
+#endif
 
       end subroutine get_available_resource
 
