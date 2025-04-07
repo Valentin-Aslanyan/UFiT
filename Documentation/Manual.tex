@@ -134,6 +134,7 @@ You will need to add some command-line arguments from the tables below:
 		\texttt{-py} & \textbf{p}eriodic \textbf{Y}  \\\hline
 		\texttt{-pz} & \textbf{p}eriodic \textbf{Z}  \\\hline
 		\texttt{-pp} & \textbf{p}eriodic $\phi$  \\\hline
+		\texttt{-gs} & \textbf{g}rid \textbf{s}eparate or \textbf{s}taggered  \\\hline
 		\texttt{-se} & \textbf{s}ave fieldline \textbf{e}ndpoints \\\hline
 		\texttt{-sf} & \textbf{s}ave \textbf{f}ieldlines \\\hline
 		\texttt{-sq} & \textbf{s}ave squashing factor $\mathbf{Q}$  \\\hline
@@ -177,6 +178,7 @@ Each line in the command file specifies one argument, beginning with one of the 
 		\texttt{PY:} & \textbf{p}eriodic \textbf{Y}  \\\hline
 		\texttt{PZ:} & \textbf{p}eriodic \textbf{Z}  \\\hline
 		\texttt{PP:} & \textbf{p}eriodic $\phi$  \\\hline
+		\texttt{GS:} & \textbf{g}rid \textbf{s}eparate or \textbf{s}taggered  \\\hline
 		\texttt{SE:} & \textbf{s}ave fieldline \textbf{e}ndpoints \\\hline
 		\texttt{SF:} & \textbf{s}ave \textbf{f}ieldlines \\\hline
 		\texttt{SQ:} & \textbf{s}ave squashing factor $\mathbf{Q}$  \\\hline
@@ -289,7 +291,7 @@ In all cases, any more lines than are strictly necessary will be ignored. After 
 \vspace{2mm}
 {\Large \textbf{Supported $B$ files}}
 
-\texttt{UFiT} is intended to read the magnetic field from common MHD codes directly. By default, the type of file will be determined inherently from its extension (or start in the case of a \texttt{flicks} file from \texttt{ARMS}). Otherwise, you can use the command line argument \texttt{-bt} to specify which code created it, if you have changed the extension for example. The following table shows the currently supported file types and the code which goes after the argument \texttt{-bt} to manually specify them:
+\texttt{UFiT} is intended to read the magnetic field from common MHD codes directly. By default, the type of file will be determined inherently from its extension (or start in the case of a \texttt{flicks}/\texttt{bfield} file from \texttt{ARMS}). Otherwise, you can use the command line argument \texttt{-bt} to specify which code created it, if you have changed the extension for example. The following table shows the currently supported file types and the code which goes after the argument \texttt{-bt} to manually specify them:
 
 \vspace{2mm}
 \begin{tabular}{|c|c|l|}		
@@ -300,10 +302,23 @@ In all cases, any more lines than are strictly necessary will be ignored. After 
 		\texttt{10} & \texttt{.nc} & \texttt{DUMFRIC} \\\hline
 		\texttt{20} & \texttt{.sdf} & \texttt{Lare3d} \\\hline
 		\texttt{30} & \texttt{flicks.} & \texttt{ARMS} \\\hline
+		\texttt{31} & \texttt{bfield.} & \texttt{ARMS} \\\hline
 \end{tabular}
 \vspace{2mm}
 
 If you have the magnetic field from some other source, you can always save it in the default \texttt{UFiT} format using the \texttt{Python} function \texttt{write\_B\_file()} (see below), or create a function in another language with the \texttt{Python} function as a reference.
+
+{\large \textbf{Regular vs irregular grids}}
+
+We define a ``regular'' 3-dimensional grid of points as one made up of 
+ $\vec{v}_1 \otimes \vec{v}_2 \otimes \vec{v}_3$
+In other words, this is the ordinary bunch of cuboids you think of when a 3-dimensional grid comes to mind. Note that the spacing between the points does not need to be constant, or identical, and nor does the number of points in each 
+This is the preferred way to input the magnetic field to \texttt{UFiT}.
+
+{\large \textbf{Separate (or staggered) grids}}
+
+It is normally assumed that the $B$-field is defined on a single 3-dimensional grid, namely that at every grid point a vector $\vec{B}$ is completely known. A ``separate'' grid is one where each of the components of $B$ is defined at differing spatial locations. There are effectively three separate grids, which may have different numbers and separations of points. This means that, 
+Each component of $B$ is then interpolated separately.
 
 
 \vspace{2mm}
@@ -325,7 +340,7 @@ which must be changed to instead contain a path to where the file \texttt{UFiT\_
 You may create a \texttt{Python} script which calls compiled routines in \texttt{UFiT\_Python\_Callable.so} directly, without the go-between of calling from command line and writing in/outputs to disk. Example 2 above features just such a script.
 
 
-\vspace{2mm}
+\vspace{3mm}
 {\Large \textbf{User defined calculations}}
 
 You are, of course, free to change the source code as you see fit. The easiest way to run your own bespoke calculation might be to use the \texttt{user\_defined} or \texttt{-ud} option. You will then need to modify the file 
@@ -342,6 +357,11 @@ which by default contains three subroutines:
 \end{enumerate}
 
 The default version calculates $|\mathbf{B}|$ at each end of the field line and then saves the expansion factor $|\mathbf{B}_+|^2/|\mathbf{B}_-|^2$ as the user quantity. Any end quantity can be easily calculated by changing this directly. A quantity, such as a sum or a maximum, along field lines must be calculated by adding lines inside the two \texttt{do while} loops. Define and allocate additional variables as required.
+
+
+
+\vspace{3mm}
+{\Large \textbf{Visualization Routines}}
 
 
 \end{document}
