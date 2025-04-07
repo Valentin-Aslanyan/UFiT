@@ -559,6 +559,8 @@ module UFiT_Functions_Fortran
           else if (stp_idx .ge. 7) then
             if (B_filename(stp_idx-6:stp_idx-1) .eq. 'flicks') then
               Bfile_type_actual = 30
+            else if (B_filename(stp_idx-6:stp_idx-1) .eq. 'bfield') then
+              Bfile_type_actual = 31
             else
               print *, 'unable to automatically identify Bfile type: ', Bfile_type
               call EXIT(102)
@@ -570,7 +572,7 @@ module UFiT_Functions_Fortran
             call EXIT(102)
           end if
         else if ((Bfile_type .eq. 0) .or. (Bfile_type .eq. 10) .or. (Bfile_type .eq. 20) .or. &
-                 (Bfile_type .eq. 30)) then
+                 (Bfile_type .eq. 30) .or. (Bfile_type .eq. 31)) then
           Bfile_type_actual = Bfile_type
         else
           print *, 'unrecognised Bfile type: ', Bfile_type
@@ -657,14 +659,18 @@ module UFiT_Functions_Fortran
           END IF
           call load_Lare3d
       !ARMS flicks, geometry from header (3D)
-        else if (Bfile_type_actual .eq. 30) then
+        else if ((Bfile_type_actual .eq. 30) .or. (Bfile_type_actual .eq. 31)) then
           grid_regular = .false.
           IF (grid_separate) THEN
             print *, 'Separate/staggered grid setting not yet implemented for ARMS output file'
             print *, 'Attempting to use ordinary grid instead'
             grid_separate = .false.
           END IF
-          call load_ARMS
+          IF (Bfile_type_actual .eq. 30) THEN
+            call load_ARMS_flicks
+          ELSE IF (Bfile_type_actual .eq. 31) THEN
+            call load_ARMS_bfield
+          END IF
         end if
 
       end subroutine load_Bfield
@@ -1398,7 +1404,7 @@ module UFiT_Functions_Fortran
       end subroutine load_Lare3d
 
 
-      subroutine load_ARMS
+      subroutine load_ARMS_flicks
 
         INTEGER :: stp_idx, hdr_unit, flicks_unit, stat, stat2, qtynum, B_start_idx
         INTEGER :: idx_leaf, idx_blk, idx1, idx2, idx3, real_size
@@ -1607,7 +1613,134 @@ module UFiT_Functions_Fortran
           DEALLOCATE(data_temp64)
         end if
 
-      end subroutine load_ARMS
+      end subroutine load_ARMS_flicks
+
+
+      subroutine load_ARMS_bfield
+
+        INTEGER :: stp_idx, hdr_unit, bfield_unit, stat, stat2
+        INTEGER :: idx_leaf, idx_blk, idx1, idx2, idx3
+        LOGICAL :: log_grid, stop_found, bfile_exists
+        INTEGER(4) :: ntblks, nlblks
+        INTEGER(4) :: iputwrk(35)
+        REAL(8) :: time64
+        REAL(8) :: rputwrk64(6)
+        REAL(8), DIMENSION(:), ALLOCATABLE :: data_temp64
+        CHARACTER(len=str_mx) :: hdr_line
+        CHARACTER(len=4) :: blank4
+        CHARACTER(len=8) :: blank8
+        CHARACTER(len=str_mx) :: hdr_filename
+
+        stop_found = .false.
+
+        stp_idx = str_mx
+        DO WHILE ((stp_idx .gt. 0) .and. (.not. stop_found))
+          if (B_filename(stp_idx:stp_idx) .eq. '.') then
+            stop_found = .true.
+          else
+            stp_idx = stp_idx - 1
+          end if
+        END DO
+        hdr_filename=B_filename(1:stp_idx) // 'hdr'
+
+        inquire(file=TRIM(hdr_filename), exist=bfile_exists)
+        IF (.not. bfile_exists) THEN
+          print *, 'Unable to open bfield header file (must end with .hdr)'
+          print *, 'This should be in the same directory as the target bfield file'
+          print *, 'Attemped to read filename: '
+          print *, TRIM(hdr_filename)
+          call EXIT(135)
+        END IF
+        open(newunit=hdr_unit,file=TRIM(hdr_filename),form="formatted")
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+      !Currently defined coordinate types
+        if (TRIM(hdr_line) .eq. 'Cartesian') then
+          geometry = 0
+          log_grid = .false.
+        else if (TRIM(hdr_line) .eq. 'Spherical Linear') then
+          geometry = 1
+          log_grid = .false.
+        else if (TRIM(hdr_line) .eq. 'Spherical Exponential') then
+          geometry = 1
+          log_grid = .true.
+        else if (TRIM(hdr_line) .eq. 'Cylindrical') then
+          geometry = 2
+          log_grid = .false.
+        else
+          print *, 'unable to identify ARMS coordinate type: ', TRIM(hdr_line)
+          call EXIT(136)
+        end if
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_line(1:2),*,iostat=stat2) sz_1
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_line(1:2),*,iostat=stat2) sz_2
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_line(1:2),*,iostat=stat2) sz_3
+        close(hdr_unit)
+
+        ALLOCATE(data_temp64(3))
+        inquire(file=B_filename, exist=bfile_exists)
+        IF (.not. bfile_exists) THEN
+          print *, 'Unable to open bfield file'
+          print *, 'Attemped to read filename: '
+          print *, TRIM(hdr_filename)
+          call EXIT(137)
+        END IF
+        open(newunit=bfield_unit,file=B_filename,access='stream',convert='big_endian')
+        read(bfield_unit) blank4
+        read(bfield_unit) time64
+        read(bfield_unit) blank8
+        read(bfield_unit) ntblks
+        read(bfield_unit) nlblks
+        num_blocks = nlblks
+        read(bfield_unit) blank4
+        ALLOCATE(grid1_ir(2,num_blocks))
+        ALLOCATE(grid2_ir(2,num_blocks))
+        ALLOCATE(grid3_ir(2,num_blocks))
+        ALLOCATE(B_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
+
+        idx_leaf = 1
+        DO idx_blk = 1,ntblks
+          read(bfield_unit) blank4
+          read(bfield_unit) iputwrk
+          read(bfield_unit) blank8
+          read(bfield_unit) rputwrk64
+          read(bfield_unit) blank4
+          if (iputwrk(3) .eq. 1) then
+            if (log_grid) then
+              grid1_ir(:,idx_leaf) = EXP(rputwrk64(1:2))
+            else
+              grid1_ir(:,idx_leaf) = rputwrk64(1:2)
+            end if
+            if (geometry .eq. 1) then
+              grid2_ir(:,idx_leaf) = 0.5_num*PI - rputwrk64(3:4)
+            else
+              grid2_ir(:,idx_leaf) = rputwrk64(3:4)
+            end if
+            if (geometry .eq. 1) then
+              grid3_ir(:,idx_leaf) = rputwrk64(5:6) + PI
+            else
+              grid3_ir(:,idx_leaf) = rputwrk64(5:6)
+            end if
+            DO idx3 = 1,sz_3
+              DO idx2 = 1,sz_2
+                DO idx1 = 1,sz_1
+                  read(bfield_unit) blank4
+                  read(bfield_unit) data_temp64
+                  B_grid_ir(:,idx1,idx2,idx3,idx_leaf)=data_temp64
+                  read(bfield_unit) blank4
+                END DO
+              END DO
+            END DO
+            idx_leaf = idx_leaf + 1
+          end if
+        END DO
+
+        close(bfield_unit)
+        DEALLOCATE(data_temp64)
+
+      end subroutine load_ARMS_bfield
 
 
       subroutine write_output
