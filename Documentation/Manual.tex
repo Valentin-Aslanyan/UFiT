@@ -311,6 +311,20 @@ In all cases, any more lines than are strictly necessary will be ignored. After 
 If you have the magnetic field from some other source, you can always save it in the default \texttt{UFiT} format using the \texttt{Python} function \texttt{write\_B\_file()} (see below), or create a function in another language with the \texttt{Python} function as a reference.
 
 {\large \textbf{Regular vs irregular grids}}
+<<<<<<< HEAD
+=======
+
+We define a ``regular'' 3-dimensional grid of points as one made up of 
+ $\vec{v}_1 \otimes \vec{v}_2 \otimes \vec{v}_3$
+In other words, this is the ordinary bunch of cuboids you think of when a 3-dimensional grid comes to mind. Note that the spacing between the points does not need to be constant, or identical, and nor does the number of points in each 
+This is the preferred way to input the magnetic field to \texttt{UFiT}.
+
+{\large \textbf{Separate (or staggered) grids}}
+
+It is normally assumed that the $B$-field is defined on a single 3-dimensional grid, namely that at every grid point a vector $\vec{B}$ is completely known. A ``separate'' grid is one where each of the components of $B$ is defined at differing spatial locations. There are effectively three separate grids, which may have different numbers and separations of points. This means that, 
+Each component of $B$ is then interpolated separately.
+
+>>>>>>> 5621244d6faabc838f9707ca3a1ff0fca554d312
 
 We define a ``regular'' 3-dimensional grid of points as one made up of an outer product of 3 individual vectors, $\vec{v}_1 \otimes \vec{v}_2 \otimes \vec{v}_3$, such that each vector gives points in its respective dimension and the set of grid points is every possible combination of elements from the three vectors. In other words, this is the ordinary bunch of cuboids you think of when a 3-dimensional grid comes to mind. Note that the spacing between the points does not need to be constant, or identical, and nor does the number of points in each dimension need to be identical. This is the preferred way to input the magnetic field to \texttt{UFiT}.
 
