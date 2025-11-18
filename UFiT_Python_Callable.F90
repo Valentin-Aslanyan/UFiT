@@ -21,6 +21,7 @@ subroutine UFiT_Python_Callable(IN_geometry, &
                                 IN_include_curvature, &
                                 IN_num_proc, &
                                 IN_MAX_STEPS, &
+                                IN_integration_scheme, &
                                 IN_step_size, &
                                 IN_B_filename, &
                                 IN_out_filename, &
@@ -99,6 +100,7 @@ subroutine UFiT_Python_Callable(IN_geometry, &
       integer(c_int), intent(in), value :: IN_include_curvature
       integer(c_int), intent(in), value :: IN_num_proc
       integer(c_int), intent(in), value :: IN_MAX_STEPS
+      integer(c_int), intent(in), value :: IN_integration_scheme
       REAL(c_double), intent(in), value :: IN_step_size
       CHARACTER(kind=C_CHAR), intent(in) ::  IN_B_filename(str_mx)
       CHARACTER(kind=C_CHAR), intent(in) ::  IN_out_filename(str_mx)
@@ -174,6 +176,7 @@ subroutine UFiT_Python_Callable(IN_geometry, &
       include_curvature = cint_to_logical(IN_include_curvature)
       num_proc = IN_num_proc
       MAX_STEPS = IN_MAX_STEPS
+      integration_scheme = IN_integration_scheme
       step_size = IN_step_size
       B_filename = TRIM(transfer(IN_B_filename(1:str_mx), B_filename))
       out_filename = TRIM(transfer(IN_out_filename(1:str_mx), out_filename))

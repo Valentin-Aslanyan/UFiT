@@ -18,8 +18,9 @@ module UFiT_User_Functions
 
 
       subroutine trace_cartesian_user(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                      B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                      pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                      B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                      pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                      pos_step_total,dl)
       !Trace fieldlines, calculate user defined quantity (Cartesian)
 
         procedure(check_position_iface) :: check_position
@@ -28,6 +29,7 @@ module UFiT_User_Functions
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -61,7 +63,7 @@ module UFiT_User_Functions
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
         end if
@@ -84,7 +86,7 @@ module UFiT_User_Functions
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in,pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in,pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
@@ -97,8 +99,9 @@ module UFiT_User_Functions
 
 
       subroutine trace_spherical_user(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                      B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                      pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                      B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                      pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                      pos_step_total,dl)
       !Trace fieldlines, calculate user defined quantity (spherical)
 
         procedure(check_position_iface) :: check_position
@@ -107,6 +110,7 @@ module UFiT_User_Functions
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -140,7 +144,7 @@ module UFiT_User_Functions
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
         end if
@@ -163,7 +167,7 @@ module UFiT_User_Functions
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if

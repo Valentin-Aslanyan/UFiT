@@ -15,6 +15,7 @@ module UFiT_Definitions_Fortran
       LOGICAL :: normalized_B, include_curvature, periodic_X, periodic_Y, periodic_Z, periodic_PHI
       INTEGER :: num_proc
       INTEGER :: MAX_STEPS
+      INTEGER :: integration_scheme
       REAL(num) :: step_size
       LOGICAL :: read_command_file, print_devices
       INTEGER :: sz_1, sz_2, sz_3, num_blocks
@@ -106,7 +107,7 @@ module UFiT_Definitions_Fortran
         end subroutine B_gradB_interp_iface
 
         subroutine single_step_iface (idx_in, pos_in, pos_out, u_vec, v_vec, dl, keep_running, &
-                                  check_position, B_interp, B_gradB_interp)
+                                      check_position, B_interp, B_gradB_interp)
           IMPORT
           INTEGER :: idx_in(9)
           REAL(num) :: pos_in(3), pos_out(3), u_vec(3), v_vec(3), dl
@@ -117,8 +118,9 @@ module UFiT_Definitions_Fortran
         end subroutine single_step_iface
 
         subroutine trace_fl_iface (check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                   B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                   pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                   pos_step_total,dl)
           IMPORT
           procedure(check_position_iface) :: check_position
           procedure(intercept_boundary_iface) :: intercept_boundary
@@ -126,6 +128,7 @@ module UFiT_Definitions_Fortran
           procedure(Bfull_interp_iface) :: Bfull_interp
           procedure(B_gradB_interp_iface) :: B_gradB_interp
           procedure(single_step_iface) :: single_step
+          procedure(single_step_iface) :: final_step
           REAL(num) :: pos_start(3)
           REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
           REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q

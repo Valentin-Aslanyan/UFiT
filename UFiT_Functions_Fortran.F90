@@ -9,7 +9,9 @@
 module UFiT_Functions_Fortran
       USE UFiT_Definitions_Fortran
       USE UFiT_User_Functions
+#ifdef _OPENMP
       USE OMP_LIB
+#endif
 #ifdef USE_NC
       USE netcdf
 #endif
@@ -50,6 +52,7 @@ module UFiT_Functions_Fortran
         include_curvature = .false. !Use full curvature formula for spherical coordinates
         num_proc = 1
         MAX_STEPS = 5000
+        integration_scheme = 1
         step_size = 0.005_num
         cmd_filename = 'ufit.dat'   !trace options, if not specified by command line
         B_filename   = 'ufit.bin'   !magnetic field
@@ -139,6 +142,14 @@ module UFiT_Functions_Fortran
                 read(arg,*,iostat=stat) MAX_STEPS
                 if (stat .ne. 0) then
                   print *, 'unrecognised step number: ', TRIM(arg)
+                end if
+
+              case ('-is', '--integration_scheme')
+                idx = idx + 1
+                CALL getarg(idx, arg)
+                read(arg,*,iostat=stat) integration_scheme
+                if (stat .ne. 0) then
+                  print *, 'unrecognised integration scheme: ', TRIM(arg)
                 end if
 
               case ('-c', '--command_file')
@@ -315,6 +326,12 @@ module UFiT_Functions_Fortran
                     print *, 'unrecognised maximum steps: ', TRIM(arg2)
                   end if
 
+                case ('IS:')
+                  read(arg2,*,iostat=stat2) integration_scheme
+                  if (stat2 .ne. 0) then
+                    print *, 'unrecognised integration scheme: ', TRIM(arg2)
+                  end if
+
                 case ('C:')
                   cmd_filename = TRIM(arg2)
                   read_command_file = .true.
@@ -358,6 +375,8 @@ module UFiT_Functions_Fortran
       subroutine get_available_resource
       !Find the number of CPUs/GPUs
 
+#ifdef _OPENMP
+      !OpenMP for parallelism
         IF (print_devices) THEN
           print *, "Number of CPUs available: ", OMP_GET_MAX_THREADS()
         END IF
@@ -367,6 +386,10 @@ module UFiT_Functions_Fortran
         ELSE IF (num_proc .lt. 1) THEN
           num_proc = 1
         END IF
+#else
+      !OpenMP not detected
+        num_proc = 1
+#endif
 
       end subroutine get_available_resource
 
@@ -559,6 +582,8 @@ module UFiT_Functions_Fortran
           else if (stp_idx .ge. 7) then
             if (B_filename(stp_idx-6:stp_idx-1) .eq. 'flicks') then
               Bfile_type_actual = 30
+            else if (B_filename(stp_idx-6:stp_idx-1) .eq. 'bfield') then
+              Bfile_type_actual = 31
             else
               print *, 'unable to automatically identify Bfile type: ', Bfile_type
               call EXIT(102)
@@ -570,7 +595,7 @@ module UFiT_Functions_Fortran
             call EXIT(102)
           end if
         else if ((Bfile_type .eq. 0) .or. (Bfile_type .eq. 10) .or. (Bfile_type .eq. 20) .or. &
-                 (Bfile_type .eq. 30)) then
+                 (Bfile_type .eq. 30) .or. (Bfile_type .eq. 31)) then
           Bfile_type_actual = Bfile_type
         else
           print *, 'unrecognised Bfile type: ', Bfile_type
@@ -657,14 +682,18 @@ module UFiT_Functions_Fortran
           END IF
           call load_Lare3d
       !ARMS flicks, geometry from header (3D)
-        else if (Bfile_type_actual .eq. 30) then
+        else if ((Bfile_type_actual .eq. 30) .or. (Bfile_type_actual .eq. 31)) then
           grid_regular = .false.
           IF (grid_separate) THEN
             print *, 'Separate/staggered grid setting not yet implemented for ARMS output file'
             print *, 'Attempting to use ordinary grid instead'
             grid_separate = .false.
           END IF
-          call load_ARMS
+          IF (Bfile_type_actual .eq. 30) THEN
+            call load_ARMS_flicks
+          ELSE IF (Bfile_type_actual .eq. 31) THEN
+            call load_ARMS_bfield
+          END IF
         end if
 
       end subroutine load_Bfield
@@ -1398,7 +1427,7 @@ module UFiT_Functions_Fortran
       end subroutine load_Lare3d
 
 
-      subroutine load_ARMS
+      subroutine load_ARMS_flicks
 
         INTEGER :: stp_idx, hdr_unit, flicks_unit, stat, stat2, qtynum, B_start_idx
         INTEGER :: idx_leaf, idx_blk, idx1, idx2, idx3, real_size
@@ -1607,7 +1636,134 @@ module UFiT_Functions_Fortran
           DEALLOCATE(data_temp64)
         end if
 
-      end subroutine load_ARMS
+      end subroutine load_ARMS_flicks
+
+
+      subroutine load_ARMS_bfield
+
+        INTEGER :: stp_idx, hdr_unit, bfield_unit, stat, stat2
+        INTEGER :: idx_leaf, idx_blk, idx1, idx2, idx3
+        LOGICAL :: log_grid, stop_found, bfile_exists
+        INTEGER(4) :: ntblks, nlblks
+        INTEGER(4) :: iputwrk(35)
+        REAL(8) :: time64
+        REAL(8) :: rputwrk64(6)
+        REAL(8), DIMENSION(:), ALLOCATABLE :: data_temp64
+        CHARACTER(len=str_mx) :: hdr_line
+        CHARACTER(len=4) :: blank4
+        CHARACTER(len=8) :: blank8
+        CHARACTER(len=str_mx) :: hdr_filename
+
+        stop_found = .false.
+
+        stp_idx = str_mx
+        DO WHILE ((stp_idx .gt. 0) .and. (.not. stop_found))
+          if (B_filename(stp_idx:stp_idx) .eq. '.') then
+            stop_found = .true.
+          else
+            stp_idx = stp_idx - 1
+          end if
+        END DO
+        hdr_filename=B_filename(1:stp_idx) // 'hdr'
+
+        inquire(file=TRIM(hdr_filename), exist=bfile_exists)
+        IF (.not. bfile_exists) THEN
+          print *, 'Unable to open bfield header file (must end with .hdr)'
+          print *, 'This should be in the same directory as the target bfield file'
+          print *, 'Attemped to read filename: '
+          print *, TRIM(hdr_filename)
+          call EXIT(135)
+        END IF
+        open(newunit=hdr_unit,file=TRIM(hdr_filename),form="formatted")
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+      !Currently defined coordinate types
+        if (TRIM(hdr_line) .eq. 'Cartesian') then
+          geometry = 0
+          log_grid = .false.
+        else if (TRIM(hdr_line) .eq. 'Spherical Linear') then
+          geometry = 1
+          log_grid = .false.
+        else if (TRIM(hdr_line) .eq. 'Spherical Exponential') then
+          geometry = 1
+          log_grid = .true.
+        else if (TRIM(hdr_line) .eq. 'Cylindrical') then
+          geometry = 2
+          log_grid = .false.
+        else
+          print *, 'unable to identify ARMS coordinate type: ', TRIM(hdr_line)
+          call EXIT(136)
+        end if
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_line(1:2),*,iostat=stat2) sz_1
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_line(1:2),*,iostat=stat2) sz_2
+        read(hdr_unit, '(A)', iostat=stat) hdr_line
+        read(hdr_line(1:2),*,iostat=stat2) sz_3
+        close(hdr_unit)
+
+        ALLOCATE(data_temp64(3))
+        inquire(file=B_filename, exist=bfile_exists)
+        IF (.not. bfile_exists) THEN
+          print *, 'Unable to open bfield file'
+          print *, 'Attemped to read filename: '
+          print *, TRIM(hdr_filename)
+          call EXIT(137)
+        END IF
+        open(newunit=bfield_unit,file=B_filename,access='stream',convert='big_endian')
+        read(bfield_unit) blank4
+        read(bfield_unit) time64
+        read(bfield_unit) blank8
+        read(bfield_unit) ntblks
+        read(bfield_unit) nlblks
+        num_blocks = nlblks
+        read(bfield_unit) blank4
+        ALLOCATE(grid1_ir(2,num_blocks))
+        ALLOCATE(grid2_ir(2,num_blocks))
+        ALLOCATE(grid3_ir(2,num_blocks))
+        ALLOCATE(B_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
+
+        idx_leaf = 1
+        DO idx_blk = 1,ntblks
+          read(bfield_unit) blank4
+          read(bfield_unit) iputwrk
+          read(bfield_unit) blank8
+          read(bfield_unit) rputwrk64
+          read(bfield_unit) blank4
+          if (iputwrk(3) .eq. 1) then
+            if (log_grid) then
+              grid1_ir(:,idx_leaf) = EXP(rputwrk64(1:2))
+            else
+              grid1_ir(:,idx_leaf) = rputwrk64(1:2)
+            end if
+            if (geometry .eq. 1) then
+              grid2_ir(:,idx_leaf) = 0.5_num*PI - rputwrk64(3:4)
+            else
+              grid2_ir(:,idx_leaf) = rputwrk64(3:4)
+            end if
+            if (geometry .eq. 1) then
+              grid3_ir(:,idx_leaf) = rputwrk64(5:6) + PI
+            else
+              grid3_ir(:,idx_leaf) = rputwrk64(5:6)
+            end if
+            DO idx3 = 1,sz_3
+              DO idx2 = 1,sz_2
+                DO idx1 = 1,sz_1
+                  read(bfield_unit) blank4
+                  read(bfield_unit) data_temp64
+                  B_grid_ir(:,idx1,idx2,idx3,idx_leaf)=data_temp64
+                  read(bfield_unit) blank4
+                END DO
+              END DO
+            END DO
+            idx_leaf = idx_leaf + 1
+          end if
+        END DO
+
+        close(bfield_unit)
+        DEALLOCATE(data_temp64)
+
+      end subroutine load_ARMS_bfield
 
 
       subroutine write_output
@@ -3661,18 +3817,18 @@ module UFiT_Functions_Fortran
       end subroutine step_cartesian
 
 
-      subroutine step_cartesian_RK4(idx_in, pos_in, pos_out, dl, keep_running, &
-                                check_position, B_interp, B_gradB_interp) !TODO - fix and use this
+      subroutine step_cartesian_RK4(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
+                                keep_running, check_position, B_interp, B_gradB_interp)
 
         INTEGER :: idx_in(9)
-        REAL(num) :: pos_in(3),pos_out(3),dl
+        REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
         LOGICAL :: keep_running
         procedure(check_position_iface) :: check_position
         procedure(B_interp_iface) :: B_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_1in(3), pos_2in(3), pos_3in(3), pos_0out(3), pos_1out(3), dl_norm
-        REAL(num) :: pos_2out(3), pos_3out(3), pos_4out(3), k_1(3), k_2(3), k_3(3), k_4(3)
+        REAL(num) :: pos_2out(3), pos_3out(3), k_1(3), k_2(3), k_3(3), k_4(3)
         REAL(num) :: B_curr(3)
 
         call check_position(pos_in,pos_0out,keep_running)
@@ -3703,7 +3859,7 @@ module UFiT_Functions_Fortran
         k_4(:) = B_curr(:)*dl_norm
 
         pos_out(:) = pos_in(:) + (k_1(:) + 2.0_num*k_2(:) + 2.0_num*k_3(:) + k_4(:))/6.0_num
-        call check_position(pos_out,pos_4out,keep_running)
+        call check_position(pos_out,pos_3out,keep_running)
 
       end subroutine step_cartesian_RK4
 
@@ -3750,7 +3906,7 @@ module UFiT_Functions_Fortran
 
 
       subroutine step_cartesianQ_RK4(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
-                                 keep_running, check_position, B_interp, B_gradB_interp) !TODO - fix and use this
+                                 keep_running, check_position, B_interp, B_gradB_interp)
 
         INTEGER :: idx_in(9)
         REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
@@ -3761,7 +3917,7 @@ module UFiT_Functions_Fortran
 
         REAL(num) :: mod_B, dl_norm
         REAL(num) :: pos_1in(3), pos_2in(3), pos_3in(3), pos_0out(3), pos_1out(3), pos_2out(3)
-        REAL(num) :: pos_3out(3), pos_4out(3), k_1(3), k_2(3), k_3(3), k_4(3), B_curr(3)
+        REAL(num) :: pos_3out(3), k_1(3), k_2(3), k_3(3), k_4(3), B_curr(3)
         REAL(num) :: u_1(3), u_2(3), u_3(3), v_1(3), v_2(3), v_3(3)
         REAL(num) :: k_1u(3), k_2u(3), k_3u(3), k_4u(3), k_1v(3), k_2v(3), k_3v(3), k_4v(3)
         REAL(num) :: gradB_curr(3,3)
@@ -3830,7 +3986,7 @@ module UFiT_Functions_Fortran
         k_4v(3) = (v_3(1)*gradB_curr(3,1)+v_3(2)*gradB_curr(3,2)+v_3(3)*gradB_curr(3,3))*dl_norm
 
         pos_out(:) = pos_in(:) + (k_1(:) + 2.0_num*k_2(:) + 2.0_num*k_3(:) + k_4(:))/6.0_num
-        call check_position(pos_out,pos_4out,keep_running)
+        call check_position(pos_out,pos_3out,keep_running)
         IF (keep_running) THEN
           u_vec(:) = u_vec(:) + (k_1u(:) + 2.0_num*k_2u(:) + 2.0_num*k_3u(:) + k_4u(:))/6.0_num
           v_vec(:) = v_vec(:) + (k_1v(:) + 2.0_num*k_2v(:) + 2.0_num*k_3v(:) + k_4v(:))/6.0_num
@@ -3840,8 +3996,9 @@ module UFiT_Functions_Fortran
 
 
       subroutine trace_cartesian(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                 B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                 pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                 B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                 pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                 pos_step_total,dl)
       !Trace fieldlines, keep only endpoints
 
         procedure(check_position_iface) :: check_position
@@ -3850,6 +4007,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -3882,7 +4040,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
         end if
@@ -3904,7 +4062,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in,pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in,pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
@@ -3930,8 +4088,9 @@ module UFiT_Functions_Fortran
 
 
       subroutine trace_cartesian_f(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                   B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                   B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                   pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                   pos_step_total,dl)
       !Trace and keep full fieldline locations
 
         procedure(check_position_iface) :: check_position
@@ -3940,6 +4099,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -3973,7 +4133,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_start+1,idx_t),B_out,last_stepsize)
-          call single_step(idx_in, pos_fieldline(:,step_start+1,idx_t), &
+          call final_step(idx_in, pos_fieldline(:,step_start+1,idx_t), &
                               pos_fieldline(:,step_start,idx_t), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
@@ -3998,7 +4158,7 @@ module UFiT_Functions_Fortran
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_total+step_start-2,idx_t),B_out, &
                                   last_stepsize)
-          call single_step(idx_in,pos_fieldline(:,step_total+step_start-2,idx_t), &
+          call final_step(idx_in,pos_fieldline(:,step_total+step_start-2,idx_t), &
                                pos_fieldline(:,step_total+step_start-1,idx_t), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
@@ -4025,8 +4185,9 @@ module UFiT_Functions_Fortran
 
 
       subroutine trace_cartesian_Q(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                   B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                   B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                   pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                   pos_step_total,dl)
       !Trace and calculate Q
 
         procedure(check_position_iface) :: check_position
@@ -4035,6 +4196,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4075,7 +4237,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
@@ -4105,7 +4267,7 @@ module UFiT_Functions_Fortran
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out, &
                                   last_stepsize)
-          call single_step(idx_in,pos_curr(:), pos_next(:), u_down, v_down, &
+          call final_step(idx_in,pos_curr(:), pos_next(:), u_down, v_down, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
@@ -4153,8 +4315,9 @@ module UFiT_Functions_Fortran
 
 
       subroutine trace_cartesian_Qf(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                    B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                    B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                    pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                    pos_step_total,dl)
       !Trace, calculate Q and keep full fieldline locations
 
         procedure(check_position_iface) :: check_position
@@ -4163,6 +4326,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4205,7 +4369,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_start+1,idx_t),B_out,last_stepsize)
-          call single_step(idx_in, pos_fieldline(:,step_start+1,idx_t), &
+          call final_step(idx_in, pos_fieldline(:,step_start+1,idx_t), &
                                pos_fieldline(:,step_start,idx_t), u_down, v_down,  &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
@@ -4237,7 +4401,7 @@ module UFiT_Functions_Fortran
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_fieldline(:,step_total+step_start-2,idx_t),B_out, &
                                   last_stepsize)
-          call single_step(idx_in,pos_fieldline(:,step_total+step_start-2,idx_t), &
+          call final_step(idx_in,pos_fieldline(:,step_total+step_start-2,idx_t), &
                                pos_fieldline(:,step_total+step_start-1,idx_t), u_down, v_down,  &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
@@ -4310,6 +4474,65 @@ module UFiT_Functions_Fortran
         call check_position(pos_out,pos_0out,keep_running)
 
       end subroutine step_spherical
+
+
+      subroutine step_spherical_RK4(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
+                                keep_running, check_position, B_interp, B_gradB_interp)
+
+        INTEGER :: idx_in(9)
+        REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
+        LOGICAL :: keep_running
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+
+        REAL(num) :: mod_B, pos_1in(3), pos_2in(3), pos_3in(3), pos_0out(3), pos_1out(3)
+        REAL(num) :: pos_2out(3), pos_3out(3), k_1(3), k_2(3), k_3(3), k_4(3)
+        REAL(num) :: B_curr(3), dl_norm, r_sin_th
+
+        call check_position(pos_in,pos_0out,keep_running)
+        call B_interp(idx_in, pos_0out, B_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_0out(1)*SIN(pos_0out(2))
+        k_1(1) = B_curr(1)*dl_norm
+        k_1(2) = B_curr(2)*dl_norm/pos_0out(1)
+        k_1(3) = B_curr(3)*dl_norm/r_sin_th
+
+        pos_1in(:) = pos_in(:) + 0.5_num*k_1(:) 
+        call check_position(pos_1in,pos_1out,keep_running)
+        call B_interp(idx_in, pos_1out, B_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_1out(1)*SIN(pos_1out(2))
+        k_2(1) = B_curr(1)*dl_norm
+        k_2(2) = B_curr(2)*dl_norm/pos_1out(1)
+        k_2(3) = B_curr(3)*dl_norm/r_sin_th
+
+        pos_2in(:) = pos_in(:) + 0.5_num*k_2(:)
+        call check_position(pos_2in,pos_2out,keep_running)
+        call B_interp(idx_in, pos_2out, B_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_2out(1)*SIN(pos_2out(2))
+        k_3(1) = B_curr(1)*dl_norm
+        k_3(2) = B_curr(2)*dl_norm/pos_2out(1)
+        k_3(3) = B_curr(3)*dl_norm/r_sin_th
+
+        pos_3in(:) = pos_in(:) + k_3(:)
+        call check_position(pos_3in,pos_3out,keep_running)
+        call B_interp(idx_in, pos_3out, B_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_3out(1)*SIN(pos_3out(2))
+        k_4(1) = B_curr(1)*dl_norm
+        k_4(2) = B_curr(2)*dl_norm/pos_3out(1)
+        k_4(3) = B_curr(3)*dl_norm/r_sin_th
+
+        pos_out(:) = pos_in(:) + (k_1(:) + 2.0_num*k_2(:) + 2.0_num*k_3(:) + k_4(:))/6.0_num
+        call check_position(pos_out,pos_3out,keep_running)
+
+      end subroutine step_spherical_RK4
 
 
       subroutine step_sphericalQnoc(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
@@ -4444,9 +4667,155 @@ module UFiT_Functions_Fortran
       end subroutine step_sphericalQ
 
 
+      subroutine step_sphericalQ_RK4(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
+                                 keep_running, check_position, B_interp, B_gradB_interp)
+      !Note - gradB_curr is just partial derivatives, not actual gradient in sphericals
+      !include curvature 
+
+        INTEGER :: idx_in(9)
+        REAL(num) :: pos_in(3),pos_out(3),u_vec(3),v_vec(3),dl
+        LOGICAL :: keep_running
+        procedure(check_position_iface) :: check_position
+        procedure(B_interp_iface) :: B_interp
+        procedure(B_gradB_interp_iface) :: B_gradB_interp
+
+        REAL(num) :: mod_B, pos_1in(3), pos_2in(3), pos_3in(3), pos_0out(3), pos_1out(3)
+        REAL(num) :: pos_2out(3), pos_3out(3), k_1(3), k_2(3), k_3(3), k_4(3), k_1u(3), k_2u(3)
+        REAL(num) :: k_3u(3), k_4u(3), k_1v(3), k_2v(3), k_3v(3), k_4v(3)
+        REAL(num) :: u1(3), u2(3), u3(3), v1(3), v2(3), v3(3)
+        REAL(num) :: B_curr(3), gradB_curr(3,3), dl_norm, r_sin_th, cot_th
+
+        call check_position(pos_in,pos_0out,keep_running)
+        call B_gradB_interp(idx_in, pos_0out, B_curr, gradB_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_0out(1)*SIN(pos_0out(2))
+        k_1(1) = B_curr(1)*dl_norm
+        k_1(2) = B_curr(2)*dl_norm/pos_0out(1)
+        k_1(3) = B_curr(3)*dl_norm/r_sin_th
+      !Formula with curvature
+        cot_th = COS(pos_0out(2))/SIN(pos_0out(2))
+        k_1u(1) = (u_vec(1)*gradB_curr(1,1)+u_vec(2)*gradB_curr(1,2)/pos_0out(1) &
+                  +u_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_1u(2) = (u_vec(1)*gradB_curr(2,1)+u_vec(2)*gradB_curr(2,2)/pos_0out(1) &
+                  +u_vec(3)*gradB_curr(2,3)/r_sin_th+(u_vec(2)*B_curr(1)-u_vec(1)*B_curr(2) &
+                  )/pos_0out(1))*dl_norm
+        k_1u(3) = (u_vec(1)*gradB_curr(3,1)+u_vec(2)*gradB_curr(3,2)/pos_0out(1) &
+                  +u_vec(3)*gradB_curr(3,3)/r_sin_th+(u_vec(3)*B_curr(1)-u_vec(1)*B_curr(3) &
+                  +(u_vec(3)*B_curr(2)-u_vec(2)*B_curr(3))*cot_th)/pos_0out(1))*dl_norm
+        k_1v(1) = (v_vec(1)*gradB_curr(1,1)+v_vec(2)*gradB_curr(1,2)/pos_0out(1) &
+                  +v_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_1v(2) = (v_vec(1)*gradB_curr(2,1)+v_vec(2)*gradB_curr(2,2)/pos_0out(1) &
+                  +v_vec(3)*gradB_curr(2,3)/r_sin_th+(v_vec(2)*B_curr(1)-v_vec(1)*B_curr(2) &
+                  )/pos_0out(1))*dl_norm
+        k_1v(3) = (v_vec(1)*gradB_curr(3,1)+v_vec(2)*gradB_curr(3,2)/pos_0out(1) &
+                  +v_vec(3)*gradB_curr(3,3)/r_sin_th+(v_vec(3)*B_curr(1)-v_vec(1)*B_curr(3) &
+                  +(v_vec(3)*B_curr(2)-v_vec(2)*B_curr(3))*cot_th)/pos_0out(1))*dl_norm
+
+        pos_1in(:) = pos_in(:) + 0.5_num*k_1(:)
+        u1(:) = u_vec(:) + 0.5_num*k_1u(:)
+        v1(:) = v_vec(:) + 0.5_num*k_1v(:)
+        call check_position(pos_1in,pos_1out,keep_running)
+        call B_gradB_interp(idx_in, pos_1out, B_curr, gradB_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_1out(1)*SIN(pos_1out(2))
+        k_2(1) = B_curr(1)*dl_norm
+        k_2(2) = B_curr(2)*dl_norm/pos_1out(1)
+        k_2(3) = B_curr(3)*dl_norm/r_sin_th
+      !Formula with curvature
+        cot_th = COS(pos_1out(2))/SIN(pos_1out(2))
+        k_2u(1) = (u1(1)*gradB_curr(1,1)+u1(2)*gradB_curr(1,2)/pos_1out(1) &
+                  +u1(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_2u(2) = (u1(1)*gradB_curr(2,1)+u1(2)*gradB_curr(2,2)/pos_1out(1) &
+                  +u1(3)*gradB_curr(2,3)/r_sin_th+(u1(2)*B_curr(1)-u1(1)*B_curr(2) &
+                  )/pos_1out(1))*dl_norm
+        k_2u(3) = (u1(1)*gradB_curr(3,1)+u1(2)*gradB_curr(3,2)/pos_1out(1) &
+                  +u1(3)*gradB_curr(3,3)/r_sin_th+(u1(3)*B_curr(1)-u1(1)*B_curr(3) &
+                  +(u1(3)*B_curr(2)-u1(2)*B_curr(3))*cot_th)/pos_1out(1))*dl_norm
+        k_2v(1) = (v1(1)*gradB_curr(1,1)+v1(2)*gradB_curr(1,2)/pos_1out(1) &
+                  +v1(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_2v(2) = (v1(1)*gradB_curr(2,1)+v1(2)*gradB_curr(2,2)/pos_1out(1) &
+                  +v1(3)*gradB_curr(2,3)/r_sin_th+(v1(2)*B_curr(1)-v1(1)*B_curr(2) &
+                  )/pos_1out(1))*dl_norm
+        k_2v(3) = (v1(1)*gradB_curr(3,1)+v1(2)*gradB_curr(3,2)/pos_1out(1) &
+                  +v1(3)*gradB_curr(3,3)/r_sin_th+(v1(3)*B_curr(1)-v1(1)*B_curr(3) &
+                  +(v1(3)*B_curr(2)-v1(2)*B_curr(3))*cot_th)/pos_1out(1))*dl_norm
+
+        pos_2in(:) = pos_in(:) + 0.5_num*k_2(:)
+        u2(:) = u_vec(:) + 0.5_num*k_2u(:)
+        v2(:) = v_vec(:) + 0.5_num*k_2v(:)
+        call check_position(pos_2in,pos_2out,keep_running)
+        call B_gradB_interp(idx_in, pos_2out, B_curr, gradB_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_2out(1)*SIN(pos_2out(2))
+        k_3(1) = B_curr(1)*dl_norm
+        k_3(2) = B_curr(2)*dl_norm/pos_2out(1)
+        k_3(3) = B_curr(3)*dl_norm/r_sin_th
+      !Formula with curvature
+        cot_th = COS(pos_2out(2))/SIN(pos_2out(2))
+        k_3u(1) = (u2(1)*gradB_curr(1,1)+u2(2)*gradB_curr(1,2)/pos_2out(1) &
+                  +u2(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_3u(2) = (u2(1)*gradB_curr(2,1)+u2(2)*gradB_curr(2,2)/pos_2out(1) &
+                  +u2(3)*gradB_curr(2,3)/r_sin_th+(u2(2)*B_curr(1)-u2(1)*B_curr(2) &
+                  )/pos_2out(1))*dl_norm
+        k_3u(3) = (u2(1)*gradB_curr(3,1)+u2(2)*gradB_curr(3,2)/pos_2out(1) &
+                  +u2(3)*gradB_curr(3,3)/r_sin_th+(u2(3)*B_curr(1)-u2(1)*B_curr(3) &
+                  +(u2(3)*B_curr(2)-u2(2)*B_curr(3))*cot_th)/pos_2out(1))*dl_norm
+        k_3v(1) = (v2(1)*gradB_curr(1,1)+v2(2)*gradB_curr(1,2)/pos_2out(1) &
+                  +v2(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_3v(2) = (v2(1)*gradB_curr(2,1)+v2(2)*gradB_curr(2,2)/pos_2out(1) &
+                  +v2(3)*gradB_curr(2,3)/r_sin_th+(v2(2)*B_curr(1)-v2(1)*B_curr(2) &
+                  )/pos_2out(1))*dl_norm
+        k_3v(3) = (v2(1)*gradB_curr(3,1)+v2(2)*gradB_curr(3,2)/pos_2out(1) &
+                  +v2(3)*gradB_curr(3,3)/r_sin_th+(v2(3)*B_curr(1)-v2(1)*B_curr(3) &
+                  +(v2(3)*B_curr(2)-v2(2)*B_curr(3))*cot_th)/pos_2out(1))*dl_norm
+
+        pos_3in(:) = pos_in(:) + k_3(:)
+        u3(:) = u_vec(:) + k_3u(:)
+        v3(:) = v_vec(:) + k_3v(:)
+        call check_position(pos_3in,pos_3out,keep_running)
+        call B_gradB_interp(idx_in, pos_3out, B_curr, gradB_curr)
+        mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
+        dl_norm = dl/mod_B !Step size scaled by B
+        r_sin_th = pos_3out(1)*SIN(pos_3out(2))
+        k_4(1) = B_curr(1)*dl_norm
+        k_4(2) = B_curr(2)*dl_norm/pos_3out(1)
+        k_4(3) = B_curr(3)*dl_norm/r_sin_th
+      !Formula with curvature
+        cot_th = COS(pos_3out(2))/SIN(pos_3out(2))
+        k_4u(1) = (u3(1)*gradB_curr(1,1)+u3(2)*gradB_curr(1,2)/pos_3out(1) &
+                  +u3(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_4u(2) = (u3(1)*gradB_curr(2,1)+u3(2)*gradB_curr(2,2)/pos_3out(1) &
+                  +u3(3)*gradB_curr(2,3)/r_sin_th+(u3(2)*B_curr(1)-u3(1)*B_curr(2) &
+                  )/pos_3out(1))*dl_norm
+        k_4u(3) = (u3(1)*gradB_curr(3,1)+u3(2)*gradB_curr(3,2)/pos_3out(1) &
+                  +u3(3)*gradB_curr(3,3)/r_sin_th+(u3(3)*B_curr(1)-u3(1)*B_curr(3) &
+                  +(u3(3)*B_curr(2)-u3(2)*B_curr(3))*cot_th)/pos_3out(1))*dl_norm
+        k_4v(1) = (v3(1)*gradB_curr(1,1)+v3(2)*gradB_curr(1,2)/pos_3out(1) &
+                  +v3(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+        k_4v(2) = (v3(1)*gradB_curr(2,1)+v3(2)*gradB_curr(2,2)/pos_3out(1) &
+                  +v3(3)*gradB_curr(2,3)/r_sin_th+(v3(2)*B_curr(1)-v3(1)*B_curr(2) &
+                  )/pos_3out(1))*dl_norm
+        k_4v(3) = (v3(1)*gradB_curr(3,1)+v3(2)*gradB_curr(3,2)/pos_3out(1) &
+                  +v3(3)*gradB_curr(3,3)/r_sin_th+(v3(3)*B_curr(1)-v3(1)*B_curr(3) &
+                  +(v3(3)*B_curr(2)-v3(2)*B_curr(3))*cot_th)/pos_3out(1))*dl_norm
+
+        pos_out(:) = pos_in(:) + (k_1(:) + 2.0_num*k_2(:) + 2.0_num*k_3(:) + k_4(:))/6.0_num
+        call check_position(pos_out,pos_3out,keep_running)
+        IF (keep_running) THEN
+          u_vec(:) = u_vec(:) + (k_1u(:) + 2.0_num*k_2u(:) + 2.0_num*k_3u(:) + k_4u(:))/6.0_num
+          v_vec(:) = v_vec(:) + (k_1v(:) + 2.0_num*k_2v(:) + 2.0_num*k_3v(:) + k_4v(:))/6.0_num
+        END IF
+
+      end subroutine step_sphericalQ_RK4
+
+
       subroutine trace_spherical(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                 B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                 pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                 B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                 pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                 pos_step_total,dl)
       !Trace fieldlines, keep only endpoints
 
         procedure(check_position_iface) :: check_position
@@ -4455,6 +4824,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4487,7 +4857,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
         end if
@@ -4509,7 +4879,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
         end if
@@ -4535,8 +4905,9 @@ module UFiT_Functions_Fortran
 
 
       subroutine trace_spherical_f(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                   B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                   B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                   pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                   pos_step_total,dl)
       !Trace and keep full fieldline locations
 
         procedure(check_position_iface) :: check_position
@@ -4545,6 +4916,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4581,7 +4953,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                               -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                               B_interp, B_gradB_interp)
           pos_fieldline(:,step_start,idx_t) = pos_next(:)
@@ -4607,7 +4979,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_0, v_0, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp, B_gradB_interp)
           pos_fieldline(:,step_total+step_start-1,idx_t) = pos_next(:)
@@ -4634,8 +5006,9 @@ module UFiT_Functions_Fortran
 
 
       subroutine trace_spherical_Q(check_position,intercept_boundary,B_interp,Bfull_interp,&
-                                   B_gradB_interp, single_step,pos_start,idx_t,pos_endpoints, &
-                                   pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                   B_gradB_interp, single_step,final_step,pos_start,idx_t, &
+                                   pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                   pos_step_total,dl)
       !Trace and calculate Q
 
         procedure(check_position_iface) :: check_position
@@ -4644,6 +5017,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4684,7 +5058,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
         end if
@@ -4714,7 +5088,7 @@ module UFiT_Functions_Fortran
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out, &
                                   last_stepsize)
-          call single_step(idx_in,pos_curr(:), pos_next(:), u_up, v_up, &
+          call final_step(idx_in,pos_curr(:), pos_next(:), u_up, v_up, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
         end if
@@ -4762,8 +5136,9 @@ module UFiT_Functions_Fortran
 
 
       subroutine trace_spherical_Qf(check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                    B_gradB_interp,single_step,pos_start,idx_t,pos_endpoints, &
-                                    pos_Q,pos_fieldline,pos_step_start,pos_step_total,dl)
+                                    B_gradB_interp,single_step,final_step,pos_start,idx_t, &
+                                    pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
+                                    pos_step_total,dl)
       !Trace, calculate Q and keep full fieldline locations
 
         procedure(check_position_iface) :: check_position
@@ -4772,6 +5147,7 @@ module UFiT_Functions_Fortran
         procedure(Bfull_interp_iface) :: Bfull_interp
         procedure(B_gradB_interp_iface) :: B_gradB_interp
         procedure(single_step_iface) :: single_step
+        procedure(single_step_iface) :: final_step
         REAL(num) :: pos_start(3)
         REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
         REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q
@@ -4816,7 +5192,7 @@ module UFiT_Functions_Fortran
           mod_Bout = SQRT(B_out(1)**2+B_out(2)**2+B_out(3)**2)
           B_out(:) = -B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out,last_stepsize)
-          call single_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
+          call final_step(idx_in, pos_curr(:), pos_next(:), u_down, v_down, &
                                -last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
           pos_fieldline(:,step_start,idx_t) = pos_next(:)
@@ -4850,7 +5226,7 @@ module UFiT_Functions_Fortran
           B_out(:) = B_out(:)*dl/mod_Bout
           call intercept_boundary(pos_curr(:),B_out, &
                                   last_stepsize)
-          call single_step(idx_in,pos_curr(:), pos_next(:), u_up, v_up, &
+          call final_step(idx_in,pos_curr(:), pos_next(:), u_up, v_up, &
                                last_stepsize*dl*0.9999_num, keep_running, check_position, &
                                B_interp,B_gradB_interp)
           pos_fieldline(:,step_total+step_start-1,idx_t) = pos_next(:)
@@ -4912,6 +5288,7 @@ module UFiT_Functions_Fortran
         procedure (Bfull_interp_iface), pointer :: bfullinterp_ptr => null ()
         procedure (B_gradB_interp_iface), pointer :: bgradinterp_ptr => null ()
         procedure (single_step_iface), pointer :: step_ptr => null ()
+        procedure (single_step_iface), pointer :: fstep_ptr => null ()
         procedure (trace_fl_iface), pointer :: tr_ptr => null ()
 
         if (user_defined) then
@@ -4982,22 +5359,53 @@ module UFiT_Functions_Fortran
           end if
         end if
 
+        if ((integration_scheme .ne. 1) .and. (integration_scheme .ne. 4)) then
+          print *, 'Integration scheme not recognized; defaulting to 1'
+          print *, 'Options: 1 = 1st order Euler, 4 = RK4'
+          integration_scheme = 1
+        end if
+
         if (geometry .eq. 0) then !Cartesian
 
           if (user_defined) then
-            step_ptr => step_cartesian
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_cartesian_RK4
+            else
+              step_ptr => step_cartesian
+            end if
+            fstep_ptr => step_cartesian
             tr_ptr => trace_cartesian_user
           else if (save_Q .and. save_fieldlines) then
-            step_ptr => step_cartesianQ
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_cartesianQ_RK4
+            else
+              step_ptr => step_cartesianQ
+            end if
+            fstep_ptr => step_cartesianQ
             tr_ptr => trace_cartesian_Qf
           else if (save_Q .and. (.not. save_fieldlines)) then
-            step_ptr => step_cartesianQ
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_cartesianQ_RK4
+            else
+              step_ptr => step_cartesianQ
+            end if
+            fstep_ptr => step_cartesianQ
             tr_ptr => trace_cartesian_Q
           else if ((.not. save_Q) .and. save_fieldlines) then
-            step_ptr => step_cartesian
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_cartesian_RK4
+            else
+              step_ptr => step_cartesian
+            end if
+            fstep_ptr => step_cartesian
             tr_ptr => trace_cartesian_f
           else if ((.not. save_Q) .and. (.not. save_fieldlines)) then
-            step_ptr => step_cartesian
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_cartesian_RK4
+            else
+              step_ptr => step_cartesian
+            end if
+            fstep_ptr => step_cartesian
             tr_ptr => trace_cartesian
           end if
 
@@ -5032,19 +5440,44 @@ module UFiT_Functions_Fortran
         else if (geometry .eq. 1) then !Spherical
 
           if (user_defined) then
-            step_ptr => step_spherical
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_spherical_RK4
+            else
+              step_ptr => step_spherical
+            end if
+            fstep_ptr => step_spherical
             tr_ptr => trace_spherical_user
           else if (save_Q .and. save_fieldlines) then
-            step_ptr => step_sphericalQ
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_sphericalQ_RK4
+            else
+              step_ptr => step_sphericalQ
+            end if
+            fstep_ptr => step_sphericalQ
             tr_ptr => trace_spherical_Qf
           else if (save_Q .and. (.not. save_fieldlines)) then
-            step_ptr => step_sphericalQ
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_sphericalQ_RK4
+            else
+              step_ptr => step_sphericalQ
+            end if
+            fstep_ptr => step_sphericalQ
             tr_ptr => trace_spherical_Q
           else if ((.not. save_Q) .and. save_fieldlines) then
-            step_ptr => step_spherical
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_spherical_RK4
+            else
+              step_ptr => step_spherical
+            end if
+            fstep_ptr => step_spherical
             tr_ptr => trace_spherical_f
           else if ((.not. save_Q) .and. (.not. save_fieldlines)) then
-            step_ptr => step_spherical
+            if (integration_scheme .eq. 4) then 
+              step_ptr => step_spherical_RK4
+            else
+              step_ptr => step_spherical
+            end if
+            fstep_ptr => step_spherical
             tr_ptr => trace_spherical
           end if
 
@@ -5091,8 +5524,8 @@ module UFiT_Functions_Fortran
         do idx_t = 1, numin_tot
           call gpos_ptr(fieldline_start,idx_t)
           call tr_ptr(cpos_ptr,ibdry_ptr,binterp_ptr,bfullinterp_ptr,bgradinterp_ptr,step_ptr, &
-                      fieldline_start,idx_t,fieldline_endpoints, fieldline_Q, fieldline_allpos, &
-                      fieldline_pts, fieldline_ptn, step_size)
+                      fstep_ptr, fieldline_start, idx_t, fieldline_endpoints, fieldline_Q, &
+                      fieldline_allpos, fieldline_pts, fieldline_ptn, step_size)
         end do
       !$OMP end do
       !$OMP end parallel
