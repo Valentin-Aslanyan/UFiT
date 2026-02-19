@@ -115,6 +115,7 @@ class UFiT_call_input:	#input to call UFiT from Python
 		self.include_curvature=False
 		self.num_proc=1
 		self.MAX_STEPS=5000
+		self.integration_scheme=1
 		self.step_size=0.005
 		self.B_filename="ufit.bin"
 		self.out_filename="ufit.flf"
@@ -184,6 +185,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 
 	fortranlib = ctypes.CDLL(shared_lib_path)
 	fortranlib.argtypes = [	ctypes.c_int, 
+				ctypes.c_int, 
 				ctypes.c_int, 
 				ctypes.c_int, 
 				ctypes.c_int, 
@@ -349,6 +351,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 					ctypes.c_int(bool_to_int(UFiT_input.include_curvature)), 
 					ctypes.c_int(UFiT_input.num_proc), 
 					ctypes.c_int(UFiT_input.MAX_STEPS), 
+					ctypes.c_int(UFiT_input.integration_scheme), 
 					ctypes.c_double(UFiT_input.step_size), 
 					convert_string(UFiT_input.B_filename,UFiT_input.str_mx), 
 					convert_string(UFiT_input.out_filename,UFiT_input.str_mx), 
