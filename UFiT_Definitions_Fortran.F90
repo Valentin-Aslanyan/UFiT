@@ -10,9 +10,11 @@ module UFiT_Definitions_Fortran
       REAL(num), PARAMETER :: EPS = 1.0E-15_num  !Small value
       REAL(num), PARAMETER :: theta_periodicity_threshold = 0.03_num  !If theta grid is within this distance of pole, assume it's open
       INTEGER, PARAMETER :: str_mx = 300     ! max length of character strings
-      INTEGER :: geometry, Bfile_type, input_type, numin_tot, numin1, numin2, numin3
-      LOGICAL :: save_endpoints, save_Q, save_fieldlines, save_connection, user_defined, check_starts
-      LOGICAL :: normalized_B, include_curvature, periodic_X, periodic_Y, periodic_Z, periodic_PHI
+      INTEGER :: geometry, Bfile_type, Bfile_type_actual, input_type
+      INTEGER :: numin_tot, numin1, numin2, numin3
+      LOGICAL :: save_endpoints, save_Q, save_fieldlines, save_connection, user_defined
+      LOGICAL :: user_endpoints, check_starts, normalized_B, include_curvature
+      LOGICAL :: periodic_X, periodic_Y, periodic_Z, periodic_PHI
       INTEGER :: num_proc
       INTEGER :: MAX_STEPS
       INTEGER :: integration_scheme
@@ -117,10 +119,18 @@ module UFiT_Definitions_Fortran
           procedure(B_gradB_interp_iface) :: B_gradB_interp
         end subroutine single_step_iface
 
+        subroutine fl_classification_iface (idx_t,pos_endpoints,connection_type,Q_sign)
+          IMPORT
+          INTEGER :: idx_t
+          REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
+          BYTE :: connection_type
+          REAL(num) :: Q_sign
+        end subroutine fl_classification_iface
+
         subroutine trace_fl_iface (check_position,intercept_boundary,B_interp,Bfull_interp, &
-                                   B_gradB_interp,single_step,final_step,pos_start,idx_t, &
-                                   pos_endpoints,pos_Q,pos_fieldline,pos_step_start, &
-                                   pos_step_total,dl)
+                                   B_gradB_interp,single_step,final_step,fl_classification, &
+                                   pos_start,idx_t,pos_endpoints,pos_Q,pos_fieldline, &
+                                   pos_step_start,pos_step_total,dl)
           IMPORT
           procedure(check_position_iface) :: check_position
           procedure(intercept_boundary_iface) :: intercept_boundary
@@ -129,6 +139,7 @@ module UFiT_Definitions_Fortran
           procedure(B_gradB_interp_iface) :: B_gradB_interp
           procedure(single_step_iface) :: single_step
           procedure(single_step_iface) :: final_step
+          procedure(fl_classification_iface) :: fl_classification
           REAL(num) :: pos_start(3)
           REAL(num), DIMENSION(:,:), ALLOCATABLE :: pos_endpoints
           REAL(num), DIMENSION(:), ALLOCATABLE :: pos_Q

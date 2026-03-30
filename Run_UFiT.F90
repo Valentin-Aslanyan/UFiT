@@ -1,5 +1,3 @@
-!To compile without the makefile, run the following line (without leading exclamation mark):
-!gfortran UFiT_Functions_Fortran.F90 Run_UFiT.F90 -O3 -fopenmp -o Run_UFiT
 
 program Run_UFiT
 

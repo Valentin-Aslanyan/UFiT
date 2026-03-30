@@ -26,7 +26,7 @@ if UFiT_flf.geometry==1:
 cbar=plt.colorbar()
 cbar.solids.set_rasterized(True)
 cbar.ax.tick_params(labelsize=20,direction='in', bottom=True, top=True, left=True, right=True)
-cbar.set_label(label="$\mathrm{slog}(Q)$",fontsize=20)
+cbar.set_label(label=r"$\mathrm{slog}(Q)$",fontsize=20)
 plt.ylabel(r"$\theta$ [$^{\circ}$]",fontsize=20)
 plt.xlabel(r"$\phi$ [$^{\circ}$]",fontsize=20)
 plt.tick_params(axis='both', which='major',labelsize=20,direction='in',bottom=True, top=True, left=True, right=True)

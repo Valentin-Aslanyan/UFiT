@@ -327,7 +327,7 @@ def call_UFiT(shared_lib_path,UFiT_input):
 		UFiT_input.Q_out = np.zeros((UFiT_input.numin_tot),dtype="double")
 	if UFiT_input.save_connection:
 		UFiT_input.fieldline_connection = np.zeros((UFiT_input.numin_tot),dtype="b")
-	if UFiT_input.save_connection:
+	if UFiT_input.user_defined:
 		UFiT_input.fieldline_user = np.zeros((1,UFiT_input.numin_tot),dtype="double")
 
 
