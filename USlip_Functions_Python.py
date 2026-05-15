@@ -59,7 +59,7 @@ class USlip_call_input:	#input to call USlip from Python
 		self.return_output = False
 		self.j_grid = np.zeros((2,2,2,3),dtype="double")
 		self.sigma_grid = np.zeros((2,2,2,3),dtype="double")
-		self.sigmac_grid = np.zeros((2,2,2,3),dtype="double")
+		self.sigmaalpha_grid = np.zeros((2,2,2,3),dtype="double")
 		self.j_grid_ir = np.zeros((1,2,2,2,3),dtype="double")
 		self.sigma_grid_ir = np.zeros((1,2,2,2,3),dtype="double")
 		self.sigmaalpha_grid_ir = np.zeros((1,2,2,2,3),dtype="double")
