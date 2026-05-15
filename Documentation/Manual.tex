@@ -78,7 +78,7 @@ You should see the following 3D rendering in \texttt{mayavi} of $\mathrm{slog}(Q
 \vspace{2mm}
 {\large \textbf{Example 2: (\texttt{Python} call) Synoptic Magnetogram}}
 
-This example requires a few additional modules. Besides the usual, you will need to have the \texttt{Python} modules \texttt{wget} and \texttt{astropy} installed. You can do this by setting up a virtual environment \textit{etc}, or executing the following (you may need to have administrator rights or add the suffix \texttt{-\,-user}):
+This example requires a few additional modules. Besides the usual, you will need to have the \texttt{Python} modules \texttt{wget}, \texttt{astropy}, \texttt{pfsspy} and \texttt{sunpy} installed. You can do this by setting up a virtual environment \textit{etc}, or executing the following (you may need to have administrator rights or add the suffix \texttt{-\,-user}):
 
 $\quad\quad$\texttt{pip install astropy}
 
@@ -107,10 +107,10 @@ $\quad\quad$\texttt{python Gaussian\_Current\_USlip.py}
 
 The script wil generate a $B$-field on a grid, corresponding to something like a Z-pinch experiment. A Gaussian current profile flows in the $\hat{z}$ direction producing its own annular field through $\vec{j}=\nabla \times \vec{B}$, in addition to a constant field applied also in the $\hat{z}$ direction. The result is a helical field around this axis, such as might be seen in a tokamak.
 
-The \texttt{USlip} routines will process this $B$-field to compute the current density $\vec{j}$, the fieldline slippage rate $\vec{\Sigma}$, and the slippage from field-aligned currents $\vec{\Sigma}_{FAC}$. In fact, both a Cartesian and cylindrical version of this field is computed and processed. You should see the following figure, summarizing these quantities for both coordinate systems:
+The \texttt{USlip} routines will process this $B$-field to compute the current density $\vec{j}$, the fieldline slippage rate $\vec{\Sigma}$, and the slippage from field-aligned twist $\vec{\Sigma}_{\alpha}$. In fact, both a Cartesian and cylindrical version of this field is computed and processed. You should see the following figure, summarizing these quantities for both coordinate systems:
 
 \begin{center}
-\includegraphics[scale=0.32]{Gaussian_Current_USlip.png}
+\includegraphics[scale=0.26]{Gaussian_Current_USlip.png}
 \end{center}
 
 \newpage
@@ -434,23 +434,6 @@ You will need to add some command-line arguments from the table below:
 \vspace{2mm}
 
 Likewise, you can specify a command file
-
-\begin{tabular}{|c|l|}		
-		\hline
-		\textbf{Code} & \textbf{Effect} \\\hline\hline
-		\texttt{G:} & \textbf{g}eometry: $0 =$ Cartesian; $1 =$ Spherical; $2 =$ Cylindrical  \\\hline
-		\texttt{R:} & print available \textbf{r}esources (CPUs for now) \\\hline
-		\texttt{NP:} &  \textbf{n}umber of \textbf{p}rocessors (CPU) \\\hline
-		\texttt{PX:} & \textbf{p}eriodic \textbf{X} \\\hline
-		\texttt{PY:} & \textbf{p}eriodic \textbf{Y}  \\\hline
-		\texttt{PZ:} & \textbf{p}eriodic \textbf{Z}  \\\hline
-		\texttt{PP:} & \textbf{p}eriodic $\phi$  \\\hline
-		\texttt{GS:} & \textbf{g}rid \textbf{s}eparate or \textbf{s}taggered  \\\hline
-		\texttt{BT:} & $\mathbf{B}$ file \textbf{t}ype (as \texttt{UFiT}) \\\hline
-		\texttt{B:} & full path to $\mathbf{B}$ file \textit{e.g.} \texttt{./dir/ufit.bin} \\\hline
-		\texttt{OD:} & full path to \textbf{o}utput \textbf{d}irctory, \textit{e.g.} \texttt{./dir/} \\\hline
-
-\end{tabular}
 
 Note that, unlike \texttt{UFiT}, the command line and the \texttt{Python} versions, when running with $\quad$ \texttt{write\_output = False}, will not output a bespoke file, but instead will create a copy with the new data appended. For example, \texttt{DUMFRIC} outputs will create a new \texttt{netCDF} file with new arrays; \texttt{ARMS} outputs will have new variables added to their adaptive grids and so on. You must therefore provide the argument \texttt{-od} with a fresh directory to write this output. Alternatively, use the \texttt{Python} interface, as in Example 3 above.
 
