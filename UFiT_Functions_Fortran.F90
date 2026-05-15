@@ -5623,7 +5623,6 @@ module UFiT_Functions_Fortran
       end subroutine step_cylindricalQ
 
 
-!(TODO) - correct Lie Transport
       subroutine step_cylindricalQ_RK4(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_interp, B_gradB_interp)
       !Note - gradB_curr is just partial derivatives, not actual gradient in cylindricals
