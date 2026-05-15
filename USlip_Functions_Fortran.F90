@@ -23,14 +23,14 @@ module USlip_Functions_Fortran
       REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: curlj_grid
       REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: alpha_grid
       REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: sigma_grid
-      REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: sigmafac_grid
+      REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: sigmaalpha_grid
       !Irregular coordinate grid (e.g. ARMS blocks)
       INTEGER, DIMENSION(:,:), ALLOCATABLE :: block_neighbours_ir
       REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: j_grid_ir
       REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: curlj_grid_ir
       REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: alpha_grid_ir
       REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: sigma_grid_ir
-      REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: sigmafac_grid_ir
+      REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: sigmaalpha_grid_ir
 
       abstract interface
         subroutine adjacent_points_iface (pt_indices, adj)
@@ -1025,7 +1025,7 @@ module USlip_Functions_Fortran
             ALLOCATE(curlj_grid(3,sz_1,sz_2,sz_3))
             ALLOCATE(alpha_grid(sz_1,sz_2,sz_3))
             ALLOCATE(sigma_grid(3,sz_1,sz_2,sz_3))
-            ALLOCATE(sigmafac_grid(3,sz_1,sz_2,sz_3))
+            ALLOCATE(sigmaalpha_grid(3,sz_1,sz_2,sz_3))
           END IF
         else !Grid irregular
           IF (grid_separate) THEN
@@ -1036,7 +1036,7 @@ module USlip_Functions_Fortran
             ALLOCATE(curlj_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
             ALLOCATE(alpha_grid_ir(sz_1,sz_2,sz_3,num_blocks))
             ALLOCATE(sigma_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
-            ALLOCATE(sigmafac_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
+            ALLOCATE(sigmaalpha_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
             if (geometry .eq. 0) then !Cartesian
               call compute_block_neighbours(periodic_X, periodic_Y, periodic_Z)
             else if (geometry .eq. 1) then !Spherical
@@ -1130,11 +1130,11 @@ module USlip_Functions_Fortran
                          +curl_curr(3)*B_hat_curr(3)
                   sigma_grid(:,idx1,idx2,idx3)=-(curl_curr(:)-B_hat_curr(:)*Bdot) &
                                                    /mod_B_curr
-                  sigmafac_grid(1,idx1,idx2,idx3) = -(grad_curr(2)*B_hat_curr(3) &
+                  sigmaalpha_grid(1,idx1,idx2,idx3) = -(grad_curr(2)*B_hat_curr(3) &
                                                       -grad_curr(3)*B_hat_curr(2))
-                  sigmafac_grid(2,idx1,idx2,idx3) = -(grad_curr(3)*B_hat_curr(1) &
+                  sigmaalpha_grid(2,idx1,idx2,idx3) = -(grad_curr(3)*B_hat_curr(1) &
                                                       -grad_curr(1)*B_hat_curr(3))
-                  sigmafac_grid(3,idx1,idx2,idx3) = -(grad_curr(1)*B_hat_curr(2) &
+                  sigmaalpha_grid(3,idx1,idx2,idx3) = -(grad_curr(1)*B_hat_curr(2) &
                                                       -grad_curr(2)*B_hat_curr(1))
                 end do
               end do
@@ -1192,11 +1192,11 @@ module USlip_Functions_Fortran
                            +curl_curr(3)*B_hat_curr(3)
                     sigma_grid_ir(:,idx1,idx2,idx3,idx)=-(curl_curr(:)-B_hat_curr(:)*Bdot) &
                                                          /mod_B_curr
-                    sigmafac_grid_ir(1,idx1,idx2,idx3,idx) = -(grad_curr(2)*B_hat_curr(3) &
+                    sigmaalpha_grid_ir(1,idx1,idx2,idx3,idx) = -(grad_curr(2)*B_hat_curr(3) &
                                                             -grad_curr(3)*B_hat_curr(2))
-                    sigmafac_grid_ir(2,idx1,idx2,idx3,idx) = -(grad_curr(3)*B_hat_curr(1) &
+                    sigmaalpha_grid_ir(2,idx1,idx2,idx3,idx) = -(grad_curr(3)*B_hat_curr(1) &
                                                             -grad_curr(1)*B_hat_curr(3))
-                    sigmafac_grid_ir(3,idx1,idx2,idx3,idx) = -(grad_curr(1)*B_hat_curr(2) &
+                    sigmaalpha_grid_ir(3,idx1,idx2,idx3,idx) = -(grad_curr(1)*B_hat_curr(2) &
                                                             -grad_curr(2)*B_hat_curr(1))
                   end do
                 end do
@@ -1273,11 +1273,11 @@ module USlip_Functions_Fortran
         stat_nc = NF90_DEF_VAR(nc_id2, 'Sigmar', realtype, (/ dim1id, dim2id, dim3id /), var_id4)
         stat_nc = NF90_DEF_VAR(nc_id2, 'Sigmat', realtype, (/ dim1id, dim2id, dim3id /), var_id5)
         stat_nc = NF90_DEF_VAR(nc_id2, 'Sigmap', realtype, (/ dim1id, dim2id, dim3id /), var_id6)
-        stat_nc = NF90_DEF_VAR(nc_id2, 'SigmaFACr', realtype, (/ dim1id, dim2id, dim3id /), &
+        stat_nc = NF90_DEF_VAR(nc_id2, 'SigmaAlphar', realtype, (/ dim1id, dim2id, dim3id /), &
                                var_id7)
-        stat_nc = NF90_DEF_VAR(nc_id2, 'SigmaFACt', realtype, (/ dim1id, dim2id, dim3id /), &
+        stat_nc = NF90_DEF_VAR(nc_id2, 'SigmaAlphat', realtype, (/ dim1id, dim2id, dim3id /), &
                                var_id8)
-        stat_nc = NF90_DEF_VAR(nc_id2, 'SigmaFACp', realtype, (/ dim1id, dim2id, dim3id /), &
+        stat_nc = NF90_DEF_VAR(nc_id2, 'SigmaAlphap', realtype, (/ dim1id, dim2id, dim3id /), &
                                var_id9)
         stat_nc = NF90_ENDDEF(nc_id2)
         stat_nc = NF90_PUT_VAR(nc_id2, var_id1, j_grid(1,:,:,:))
@@ -1286,9 +1286,9 @@ module USlip_Functions_Fortran
         stat_nc = NF90_PUT_VAR(nc_id2, var_id4, sigma_grid(1,:,:,:))
         stat_nc = NF90_PUT_VAR(nc_id2, var_id5, sigma_grid(2,:,:,:))
         stat_nc = NF90_PUT_VAR(nc_id2, var_id6, sigma_grid(3,:,:,:))
-        stat_nc = NF90_PUT_VAR(nc_id2, var_id7, sigmafac_grid(1,:,:,:))
-        stat_nc = NF90_PUT_VAR(nc_id2, var_id8, sigmafac_grid(2,:,:,:))
-        stat_nc = NF90_PUT_VAR(nc_id2, var_id9, sigmafac_grid(3,:,:,:))
+        stat_nc = NF90_PUT_VAR(nc_id2, var_id7, sigmaalpha_grid(1,:,:,:))
+        stat_nc = NF90_PUT_VAR(nc_id2, var_id8, sigmaalpha_grid(2,:,:,:))
+        stat_nc = NF90_PUT_VAR(nc_id2, var_id9, sigmaalpha_grid(3,:,:,:))
         stat_nc = NF90_CLOSE(nc_id2)
 
 #else
@@ -1512,18 +1512,18 @@ module USlip_Functions_Fortran
         block_name = 'Magnetic_Field/Sigmaz'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
                                     units, sz_1, sz_2, sz_3, sigma_grid(3,:,:,:))
-        block_id = 'SigmaFACx                       '
-        block_name = 'Magnetic_Field/SigmaFACx'
+        block_id = 'SigmaAlphax                       '
+        block_name = 'Magnetic_Field/SigmaAlphax'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
-                                    units, sz_1, sz_2, sz_3, sigmafac_grid(1,:,:,:))
-        block_id = 'SigmaFACy                       '
-        block_name = 'Magnetic_Field/SigmaFACy'
+                                    units, sz_1, sz_2, sz_3, sigmaalpha_grid(1,:,:,:))
+        block_id = 'SigmaAlphay                       '
+        block_name = 'Magnetic_Field/SigmaAlphay'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
-                                    units, sz_1, sz_2, sz_3, sigmafac_grid(2,:,:,:))
-        block_id = 'SigmaFACz                       '
-        block_name = 'Magnetic_Field/SigmaFACz'
+                                    units, sz_1, sz_2, sz_3, sigmaalpha_grid(2,:,:,:))
+        block_id = 'SigmaAlphaz                       '
+        block_name = 'Magnetic_Field/SigmaAlphaz'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
-                                    units, sz_1, sz_2, sz_3, sigmafac_grid(3,:,:,:))
+                                    units, sz_1, sz_2, sz_3, sigmaalpha_grid(3,:,:,:))
 
         bytestoread = infilesize - ftell(L3D_in)
         if (bytestoread .gt. 0) then
@@ -1639,7 +1639,7 @@ module USlip_Functions_Fortran
         close(hdrin_unit)
         write(hdrout_unit, '(A)', iostat=stat2) '3CurlB'
         write(hdrout_unit, '(A)', iostat=stat2) '3Sigma'
-        write(hdrout_unit, '(A)', iostat=stat2) '3SigmaFAC'
+        write(hdrout_unit, '(A)', iostat=stat2) '3SigmaAlpha'
         close(hdrout_unit)
 
         inquire(file=TRIM(ftrin_filename), exist=bfile_exists)
@@ -1692,24 +1692,24 @@ module USlip_Functions_Fortran
                      +sigma_grid_ir(3,:,:,:,:)**2)
         write(ftrout_unit, '(E11.4,A)', iostat=stat2) SQRT(minvar), 'Min Sigma Magnitude'
         write(ftrout_unit, '(E11.4,A)', iostat=stat2) SQRT(maxvar), 'Max Sigma Magnitude'
-        minvar=MINVAL(sigmafac_grid_ir(1,:,:,:,:))
-        maxvar=MAXVAL(sigmafac_grid_ir(1,:,:,:,:))
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) minvar, 'Min R SigmaFAC'
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) maxvar, 'Max R SigmaFAC'
-        minvar=MINVAL(sigmafac_grid_ir(2,:,:,:,:))
-        maxvar=MAXVAL(sigmafac_grid_ir(2,:,:,:,:))
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) minvar, 'Min T SigmaFAC'
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) maxvar, 'Max T SigmaFAC'
-        minvar=MINVAL(sigmafac_grid_ir(3,:,:,:,:))
-        maxvar=MAXVAL(sigmafac_grid_ir(3,:,:,:,:))
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) minvar, 'Min P SigmaFAC'
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) maxvar, 'Max P SigmaFAC'
-        minvar=MINVAL(sigmafac_grid_ir(1,:,:,:,:)**2+sigmafac_grid_ir(2,:,:,:,:)**2 &
-                     +sigmafac_grid_ir(3,:,:,:,:)**2)
-        maxvar=MAXVAL(sigmafac_grid_ir(1,:,:,:,:)**2+sigmafac_grid_ir(2,:,:,:,:)**2 &
-                     +sigmafac_grid_ir(3,:,:,:,:)**2)
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) SQRT(minvar), 'Min SigmaFAC Magnitude'
-        write(ftrout_unit, '(E11.4,A)', iostat=stat2) SQRT(maxvar), 'Max SigmaFAC Magnitude'
+        minvar=MINVAL(sigmaalpha_grid_ir(1,:,:,:,:))
+        maxvar=MAXVAL(sigmaalpha_grid_ir(1,:,:,:,:))
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) minvar, 'Min R SigmaAlpha'
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) maxvar, 'Max R SigmaAlpha'
+        minvar=MINVAL(sigmaalpha_grid_ir(2,:,:,:,:))
+        maxvar=MAXVAL(sigmaalpha_grid_ir(2,:,:,:,:))
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) minvar, 'Min T SigmaAlpha'
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) maxvar, 'Max T SigmaAlpha'
+        minvar=MINVAL(sigmaalpha_grid_ir(3,:,:,:,:))
+        maxvar=MAXVAL(sigmaalpha_grid_ir(3,:,:,:,:))
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) minvar, 'Min P SigmaAlpha'
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) maxvar, 'Max P SigmaAlpha'
+        minvar=MINVAL(sigmaalpha_grid_ir(1,:,:,:,:)**2+sigmaalpha_grid_ir(2,:,:,:,:)**2 &
+                     +sigmaalpha_grid_ir(3,:,:,:,:)**2)
+        maxvar=MAXVAL(sigmaalpha_grid_ir(1,:,:,:,:)**2+sigmaalpha_grid_ir(2,:,:,:,:)**2 &
+                     +sigmaalpha_grid_ir(3,:,:,:,:)**2)
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) SQRT(minvar), 'Min SigmaAlpha Magnitude'
+        write(ftrout_unit, '(E11.4,A)', iostat=stat2) SQRT(maxvar), 'Max SigmaAlpha Magnitude'
         close(ftrout_unit)
 
         if (real_size .eq. 4) then
@@ -1773,7 +1773,7 @@ module USlip_Functions_Fortran
                     dataout_temp32(1:nvar)=datain_temp32(:)
                     dataout_temp32(nvar+1:nvar+3)=j_grid_ir(:,idx1,idx2,idx3,idx_leaf)
                     dataout_temp32(nvar+4:nvar+6)=sigma_grid_ir(:,idx1,idx2,idx3,idx_leaf)
-                    dataout_temp32(nvar+7:nvar+9)=sigmafac_grid_ir(:,idx1,idx2,idx3,idx_leaf)
+                    dataout_temp32(nvar+7:nvar+9)=sigmaalpha_grid_ir(:,idx1,idx2,idx3,idx_leaf)
                     write(flicksout_unit) dataout_temp32
                     read(flicksin_unit) qtynum
                     write(flicksout_unit) qtynum+36
@@ -1806,7 +1806,7 @@ module USlip_Functions_Fortran
                     dataout_temp64(1:nvar)=datain_temp64(:)
                     dataout_temp64(nvar+1:nvar+3)=j_grid_ir(:,idx1,idx2,idx3,idx_leaf)
                     dataout_temp64(nvar+4:nvar+6)=sigma_grid_ir(:,idx1,idx2,idx3,idx_leaf)
-                    dataout_temp64(nvar+7:nvar+9)=sigmafac_grid_ir(:,idx1,idx2,idx3,idx_leaf)
+                    dataout_temp64(nvar+7:nvar+9)=sigmaalpha_grid_ir(:,idx1,idx2,idx3,idx_leaf)
                     write(flicksout_unit) dataout_temp64
                     read(flicksin_unit) qtynum
                     write(flicksout_unit) qtynum+72
@@ -1933,7 +1933,7 @@ module USlip_Functions_Fortran
                   dataout_temp64(1:3)=datain_temp64(:)
                   dataout_temp64(4:6)=j_grid_ir(:,idx1,idx2,idx3,idx_leaf)
                   dataout_temp64(7:9)=sigma_grid_ir(:,idx1,idx2,idx3,idx_leaf)
-                  dataout_temp64(10:12)=sigmafac_grid_ir(:,idx1,idx2,idx3,idx_leaf)
+                  dataout_temp64(10:12)=sigmaalpha_grid_ir(:,idx1,idx2,idx3,idx_leaf)
                   read(bfieldin_unit) qtynum
                   write(bfieldin_unit) qtynum+72
                 END DO
@@ -1980,7 +1980,7 @@ module USlip_Functions_Fortran
           write(out_unit) B_grid
           write(out_unit) j_grid
           write(out_unit) sigma_grid
-          write(out_unit) sigmafac_grid
+          write(out_unit) sigmaalpha_grid
           close(out_unit)
         ELSE IF (Bfile_type_actual .eq. 10) THEN
           call write_slipped_DUMFRIC
@@ -2001,13 +2001,13 @@ module USlip_Functions_Fortran
         IF (ALLOCATED(curlj_grid)) DEALLOCATE(curlj_grid)
         IF (ALLOCATED(alpha_grid)) DEALLOCATE(alpha_grid)
         IF (ALLOCATED(sigma_grid)) DEALLOCATE(sigma_grid)
-        IF (ALLOCATED(sigmafac_grid)) DEALLOCATE(sigmafac_grid)
+        IF (ALLOCATED(sigmaalpha_grid)) DEALLOCATE(sigmaalpha_grid)
         IF (ALLOCATED(block_neighbours_ir)) DEALLOCATE(block_neighbours_ir)
         IF (ALLOCATED(j_grid_ir)) DEALLOCATE(j_grid_ir)
         IF (ALLOCATED(curlj_grid_ir)) DEALLOCATE(curlj_grid_ir)
         IF (ALLOCATED(alpha_grid_ir)) DEALLOCATE(alpha_grid_ir)
         IF (ALLOCATED(sigma_grid_ir)) DEALLOCATE(sigma_grid_ir)
-        IF (ALLOCATED(sigmafac_grid_ir)) DEALLOCATE(sigmafac_grid_ir)
+        IF (ALLOCATED(sigmaalpha_grid_ir)) DEALLOCATE(sigmaalpha_grid_ir)
 
       end subroutine slip_cleanup
 

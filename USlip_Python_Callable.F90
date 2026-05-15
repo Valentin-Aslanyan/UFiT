@@ -49,10 +49,10 @@ subroutine USlip_Python_Callable(IN_geometry, &
                                  IN_return_output, &
                                  OUT_j_grid, &
                                  OUT_sigma_grid, &
-                                 OUT_sigmafac_grid, &
+                                 OUT_sigmaalpha_grid, &
                                  OUT_j_grid_ir, &
                                  OUT_sigma_grid_ir, &
-                                 OUT_sigmafac_grid_ir)  bind(c, name='USlip_Python_Callable')
+                                 OUT_sigmaalpha_grid_ir)  bind(c, name='USlip_Python_Callable')
 
 
       use iso_c_binding
@@ -110,10 +110,10 @@ subroutine USlip_Python_Callable(IN_geometry, &
       integer(c_int), intent(in), value :: IN_return_output
       REAL(c_double), intent(out) :: OUT_j_grid(3,IN_sz1,IN_sz2,IN_sz3)
       REAL(c_double), intent(out) :: OUT_sigma_grid(3,IN_sz1,IN_sz2,IN_sz3)
-      REAL(c_double), intent(out) :: OUT_sigmafac_grid(3,IN_sz1,IN_sz2,IN_sz3)
+      REAL(c_double), intent(out) :: OUT_sigmaalpha_grid(3,IN_sz1,IN_sz2,IN_sz3)
       REAL(c_double), intent(out) :: OUT_j_grid_ir(3,IN_sz1,IN_sz2,IN_sz3,IN_num_blocks)
       REAL(c_double), intent(out) :: OUT_sigma_grid_ir(3,IN_sz1,IN_sz2,IN_sz3,IN_num_blocks)
-      REAL(c_double), intent(out) :: OUT_sigmafac_grid_ir(3,IN_sz1,IN_sz2,IN_sz3,IN_num_blocks)
+      REAL(c_double), intent(out) :: OUT_sigmaalpha_grid_ir(3,IN_sz1,IN_sz2,IN_sz3,IN_num_blocks)
 
 
       geometry = IN_geometry
@@ -207,11 +207,11 @@ subroutine USlip_Python_Callable(IN_geometry, &
         if (grid_regular) then
           OUT_j_grid(:,:,:,:) = j_grid(:,:,:,:)
           OUT_sigma_grid(:,:,:,:) = sigma_grid(:,:,:,:)
-          OUT_sigmafac_grid(:,:,:,:) = sigmafac_grid(:,:,:,:)
+          OUT_sigmaalpha_grid(:,:,:,:) = sigmaalpha_grid(:,:,:,:)
         else
           OUT_j_grid_ir(:,:,:,:,:) = j_grid_ir(:,:,:,:,:)
           OUT_sigma_grid_ir(:,:,:,:,:) = sigma_grid_ir(:,:,:,:,:)
-          OUT_sigmafac_grid_ir(:,:,:,:,:) = sigmafac_grid_ir(:,:,:,:,:)
+          OUT_sigmaalpha_grid_ir(:,:,:,:,:) = sigmaalpha_grid_ir(:,:,:,:,:)
         end if
       end if
 

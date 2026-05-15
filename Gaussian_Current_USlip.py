@@ -8,7 +8,7 @@ num_r = 200
 num_p = 120
 num_z = 100
 B_z_0 = 1.0
-B_p_C = 0.5
+j0 = 1.0
 
 
 view_pitch = 40.0
@@ -40,12 +40,19 @@ x_cart_grid=np.linspace(-r_max,r_max,num=num_r)
 y_cart_grid=np.linspace(-r_max,r_max,num=num_r)
 z_cart_grid=np.linspace(z_lims[0],z_lims[1],num=num_z)
 
+B_p_C = 0.5*j0*l_scale**2
 B_cyl = np.zeros((3,num_r,num_p,num_z))
 B_cyl[1,:,:,:] = (B_p_C*(1.0-np.exp(-(r_cyl_grid/l_scale)**2))/r_cyl_grid)[:,None,None]*np.ones((num_p))[None,:,None]*np.ones((num_z))[None,None,:]
 B_cyl[2,:,:,:] = B_z_0
 
 j_cyl_analytic = np.zeros((3,num_r,num_p,num_z))
 j_cyl_analytic[2,:,:,:] = (B_p_C*2.0/l_scale**2*np.exp(-(r_cyl_grid/l_scale)**2))[:,None,None]*np.ones((num_p))[None,:,None]*np.ones((num_z))[None,None,:]
+
+Sigma_cyl_analytic = np.zeros((3,num_r,num_p,num_z))
+W_cyl=2.0*j0/l_scale**2*(r_cyl_grid*np.exp(-(r_cyl_grid/l_scale)**2))[:,None,None]*np.ones((num_p))[None,:,None]*np.ones((num_z))[None,None,:]
+Sigma_cyl_analytic[1,:,:,:] = -W_cyl*B_z_0**2/(B_cyl[1,:,:,:]**2+B_z_0**2)**1.5
+Sigma_cyl_analytic[2,:,:,:] = W_cyl*B_z_0*B_cyl[1,:,:,:]/(B_cyl[1,:,:,:]**2+B_z_0**2)**1.5
+
 
 B_cart=np.zeros((3,num_r,num_r,num_z))
 xmg_cart,ymg_cart=np.meshgrid(x_cart_grid,y_cart_grid,indexing='ij')
@@ -55,6 +62,12 @@ B_cart[2,:,:,:] = B_z_0
 
 j_cart_analytic = np.zeros((3,num_r,num_r,num_z))
 j_cart_analytic[2,:,:,:] = (B_p_C*2.0/l_scale**2*np.exp(-(xmg_cart**2+ymg_cart**2)/l_scale**2))[:,:,None]*np.ones((num_z))[None,None,:]
+
+Sigma_cart_analytic = np.zeros((3,num_r,num_r,num_z))
+W_cart=2.0*j0/l_scale**2*(np.sqrt(xmg_cart**2+ymg_cart**2)*np.exp(-(xmg_cart**2+ymg_cart**2)/l_scale**2))[:,:,None]*np.ones((num_z))[None,None,:]
+Sigma_cart_analytic[0,:,:,:] = (W_cart*B_z_0**2/(B_cart[0,:,:,:]**2+B_cart[1,:,:,:]**2+B_z_0**2)**1.5)*((ymg_cart/np.sqrt(xmg_cart**2+ymg_cart**2))[:,:,None]*np.ones((num_z))[None,None,:])
+Sigma_cart_analytic[1,:,:,:] = -(W_cart*B_z_0**2/(B_cart[0,:,:,:]**2+B_cart[1,:,:,:]**2+B_z_0**2)**1.5)*((xmg_cart/np.sqrt(xmg_cart**2+ymg_cart**2))[:,:,None]*np.ones((num_z))[None,None,:])
+Sigma_cart_analytic[2,:,:,:] = W_cart*B_z_0*np.sqrt(B_cart[0,:,:,:]**2+B_cart[1,:,:,:]**2)/(B_cart[0,:,:,:]**2+B_cart[1,:,:,:]**2+B_z_0**2)**1.5
 
 ####//\\                         //\\
 
@@ -96,47 +109,55 @@ USlip_run2=call_USlip(compiled_USlip_path,USlip_run2)
 xmg_cyl = np.outer(r_cyl_grid,np.cos(p_cyl_grid))
 ymg_cyl = np.outer(r_cyl_grid,np.sin(p_cyl_grid))
 
-fig = plt.figure(figsize=(25,10))
+fig = plt.figure(figsize=(30,10))
 
-plt.subplot(2,5,1)
+plt.subplot(2,6,1)
 plt.pcolormesh(xmg_cyl,ymg_cyl,B_cyl[1,:,:,0]**2)
 plt.title("Cylindrical, $B_\\phi^2$")
 
-plt.subplot(2,5,2)
+plt.subplot(2,6,2)
 plt.pcolormesh(xmg_cyl,ymg_cyl,j_cyl_analytic[2,:,:,0])
 plt.title("Cylindrical, $j_z$, analytic")
 
-plt.subplot(2,5,3)
+plt.subplot(2,6,3)
 plt.pcolormesh(xmg_cyl,ymg_cyl,USlip_run.j_grid[2,:,:,0])
 plt.title("Cylindrical, $j_z$, from USlip")
 
-plt.subplot(2,5,4)
+plt.subplot(2,6,4)
+plt.pcolormesh(xmg_cyl,ymg_cyl,Sigma_cyl_analytic[0,:,:,0]**2+Sigma_cyl_analytic[1,:,:,0]**2+Sigma_cyl_analytic[2,:,:,0]**2)
+plt.title("Cylindrical, $|\\Sigma|^2$, analytic")
+
+plt.subplot(2,6,5)
 plt.pcolormesh(xmg_cyl,ymg_cyl,USlip_run.sigma_grid[0,:,:,0]**2+USlip_run.sigma_grid[1,:,:,0]**2+USlip_run.sigma_grid[2,:,:,0]**2)
-plt.title("Cylindrical, $|\\Sigma|^2$")
+plt.title("Cylindrical, $|\\Sigma|^2$, from Uslip")
 
-plt.subplot(2,5,5)
-plt.pcolormesh(xmg_cyl,ymg_cyl,USlip_run.sigmafac_grid[0,:,:,0]**2+USlip_run.sigmafac_grid[1,:,:,0]**2+USlip_run.sigmafac_grid[2,:,:,0]**2)
-plt.title("Cylindrical, $|\\Sigma_{FAC}|^2$")
+plt.subplot(2,6,6)
+plt.pcolormesh(xmg_cyl,ymg_cyl,USlip_run.sigmaalpha_grid[0,:,:,0]**2+USlip_run.sigmaalpha_grid[1,:,:,0]**2+USlip_run.sigmaalpha_grid[2,:,:,0]**2)
+plt.title("Cylindrical, $|\\Sigma_{\\alpha}|^2$")
 
-plt.subplot(2,5,6)
+plt.subplot(2,6,7)
 plt.pcolormesh(xmg_cart,ymg_cart,B_cart[0,:,:,0]**2+B_cart[1,:,:,0]**2)
 plt.title("Cartesian, $B_x^2+B_y^2\\equiv B_\\phi^2$")
 
-plt.subplot(2,5,7)
+plt.subplot(2,6,8)
 plt.pcolormesh(xmg_cart,ymg_cart,j_cart_analytic[2,:,:,0])
 plt.title("Cartesian, $j_z$, analytic")
 
-plt.subplot(2,5,8)
+plt.subplot(2,6,9)
 plt.pcolormesh(xmg_cart,ymg_cart,USlip_run2.j_grid[2,:,:,0])
 plt.title("Cartesian, $j_z$, from USlip")
 
-plt.subplot(2,5,9)
-plt.pcolormesh(xmg_cart,ymg_cart,USlip_run2.sigma_grid[0,:,:,0]**2+USlip_run2.sigma_grid[1,:,:,0]**2+USlip_run2.sigma_grid[2,:,:,0]**2)
-plt.title("Cartesian, $|\\Sigma|^2$")
+plt.subplot(2,6,10)
+plt.pcolormesh(xmg_cart,ymg_cart,Sigma_cart_analytic[0,:,:,0]**2+Sigma_cart_analytic[1,:,:,0]**2+Sigma_cart_analytic[2,:,:,0]**2)
+plt.title("Cartesian, $|\\Sigma|^2$, analytic")
 
-plt.subplot(2,5,10)
-plt.pcolormesh(xmg_cart,ymg_cart,USlip_run2.sigmafac_grid[0,:,:,0]**2+USlip_run2.sigmafac_grid[1,:,:,0]**2+USlip_run2.sigmafac_grid[2,:,:,0]**2)
-plt.title("Cartesian, $|\\Sigma_{FAC}|^2$")
+plt.subplot(2,6,11)
+plt.pcolormesh(xmg_cart,ymg_cart,USlip_run2.sigma_grid[0,:,:,0]**2+USlip_run2.sigma_grid[1,:,:,0]**2+USlip_run2.sigma_grid[2,:,:,0]**2)
+plt.title("Cartesian, $|\\Sigma|^2$, from Uslip")
+
+plt.subplot(2,6,12)
+plt.pcolormesh(xmg_cart,ymg_cart,USlip_run2.sigmaalpha_grid[0,:,:,0]**2+USlip_run2.sigmaalpha_grid[1,:,:,0]**2+USlip_run2.sigmaalpha_grid[2,:,:,0]**2)
+plt.title("Cartesian, $|\\Sigma_{\\alpha}|^2$")
 
 plt.savefig("Gaussian_Current_USlip.png", dpi=100,bbox_inches='tight',pad_inches=0.1)
 

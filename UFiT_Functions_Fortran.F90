@@ -5574,7 +5574,6 @@ module UFiT_Functions_Fortran
       end subroutine step_cylindrical_RK4
 
 
-!(TODO) - correct Lie Transport
       subroutine step_cylindricalQ(idx_in, pos_in, pos_out, u_vec, v_vec, dl, &
                                  keep_running, check_position, B_interp, B_gradB_interp)
       !Note - gradB_curr is just partial derivatives, not actual gradient in cylindricals
@@ -5588,33 +5587,31 @@ module UFiT_Functions_Fortran
         procedure(B_gradB_interp_iface) :: B_gradB_interp
 
         REAL(num) :: mod_B, pos_0out(3), k_1(3), B_curr(3), dl_norm
-        REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3), r_sin_th, cot_th
+        REAL(num) :: k_1u(3), k_1v(3), gradB_curr(3,3)
 
         call check_position(pos_in,pos_0out,keep_running)
         call B_gradB_interp(idx_in, pos_0out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
-        r_sin_th = pos_0out(1)*SIN(pos_0out(2))
         k_1(1) = B_curr(1)*dl_norm
         k_1(2) = B_curr(2)*dl_norm/pos_0out(1)
         k_1(3) = B_curr(3)*dl_norm
-        cot_th = COS(pos_0out(2))/SIN(pos_0out(2))
+
+
         k_1u(1) = (u_vec(1)*gradB_curr(1,1)+u_vec(2)*gradB_curr(1,2)/pos_0out(1) &
-                  +u_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +u_vec(3)*gradB_curr(1,3))*dl_norm
         k_1u(2) = (u_vec(1)*gradB_curr(2,1)+u_vec(2)*gradB_curr(2,2)/pos_0out(1) &
-                  +u_vec(3)*gradB_curr(2,3)/r_sin_th+(u_vec(2)*B_curr(1)-u_vec(1)*B_curr(2) &
-                  )/pos_0out(1))*dl_norm
+                  +u_vec(3)*gradB_curr(2,3)+(u_vec(2)*B_curr(1)-u_vec(1)*B_curr(2)) &
+                  /pos_0out(1))*dl_norm
         k_1u(3) = (u_vec(1)*gradB_curr(3,1)+u_vec(2)*gradB_curr(3,2)/pos_0out(1) &
-                  +u_vec(3)*gradB_curr(3,3)/r_sin_th+(u_vec(3)*B_curr(1)-u_vec(1)*B_curr(3) &
-                  +(u_vec(3)*B_curr(2)-u_vec(2)*B_curr(3))*cot_th)/pos_0out(1))*dl_norm
+                  +u_vec(3)*gradB_curr(3,3))*dl_norm
         k_1v(1) = (v_vec(1)*gradB_curr(1,1)+v_vec(2)*gradB_curr(1,2)/pos_0out(1) &
-                  +v_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +v_vec(3)*gradB_curr(1,3))*dl_norm
         k_1v(2) = (v_vec(1)*gradB_curr(2,1)+v_vec(2)*gradB_curr(2,2)/pos_0out(1) &
-                  +v_vec(3)*gradB_curr(2,3)/r_sin_th+(v_vec(2)*B_curr(1)-v_vec(1)*B_curr(2) &
-                  )/pos_0out(1))*dl_norm
+                  +v_vec(3)*gradB_curr(2,3)+(v_vec(2)*B_curr(1)-v_vec(1)*B_curr(2)) &
+                  /pos_0out(1))*dl_norm
         k_1v(3) = (v_vec(1)*gradB_curr(3,1)+v_vec(2)*gradB_curr(3,2)/pos_0out(1) &
-                  +v_vec(3)*gradB_curr(3,3)/r_sin_th+(v_vec(3)*B_curr(1)-v_vec(1)*B_curr(3) &
-                  +(v_vec(3)*B_curr(2)-v_vec(2)*B_curr(3))*cot_th)/pos_0out(1))*dl_norm
+                  +v_vec(3)*gradB_curr(3,3))*dl_norm
 
         pos_out(:) = pos_in(:) + k_1(:)
         call check_position(pos_out,pos_0out,keep_running)
@@ -5643,33 +5640,29 @@ module UFiT_Functions_Fortran
         REAL(num) :: pos_2out(3), pos_3out(3), k_1(3), k_2(3), k_3(3), k_4(3), k_1u(3), k_2u(3)
         REAL(num) :: k_3u(3), k_4u(3), k_1v(3), k_2v(3), k_3v(3), k_4v(3)
         REAL(num) :: u1(3), u2(3), u3(3), v1(3), v2(3), v3(3)
-        REAL(num) :: B_curr(3), gradB_curr(3,3), dl_norm, r_sin_th, cot_th
+        REAL(num) :: B_curr(3), gradB_curr(3,3), dl_norm
 
         call check_position(pos_in,pos_0out,keep_running)
         call B_gradB_interp(idx_in, pos_0out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
-        r_sin_th = pos_0out(1)*SIN(pos_0out(2))
         k_1(1) = B_curr(1)*dl_norm
         k_1(2) = B_curr(2)*dl_norm/pos_0out(1)
         k_1(3) = B_curr(3)*dl_norm
-        cot_th = COS(pos_0out(2))/SIN(pos_0out(2))
         k_1u(1) = (u_vec(1)*gradB_curr(1,1)+u_vec(2)*gradB_curr(1,2)/pos_0out(1) &
-                  +u_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +u_vec(3)*gradB_curr(1,3))*dl_norm
         k_1u(2) = (u_vec(1)*gradB_curr(2,1)+u_vec(2)*gradB_curr(2,2)/pos_0out(1) &
-                  +u_vec(3)*gradB_curr(2,3)/r_sin_th+(u_vec(2)*B_curr(1)-u_vec(1)*B_curr(2) &
-                  )/pos_0out(1))*dl_norm
+                  +u_vec(3)*gradB_curr(2,3)+(u_vec(2)*B_curr(1)-u_vec(1)*B_curr(2)) &
+                  /pos_0out(1))*dl_norm
         k_1u(3) = (u_vec(1)*gradB_curr(3,1)+u_vec(2)*gradB_curr(3,2)/pos_0out(1) &
-                  +u_vec(3)*gradB_curr(3,3)/r_sin_th+(u_vec(3)*B_curr(1)-u_vec(1)*B_curr(3) &
-                  +(u_vec(3)*B_curr(2)-u_vec(2)*B_curr(3))*cot_th)/pos_0out(1))*dl_norm
+                  +u_vec(3)*gradB_curr(3,3))*dl_norm
         k_1v(1) = (v_vec(1)*gradB_curr(1,1)+v_vec(2)*gradB_curr(1,2)/pos_0out(1) &
-                  +v_vec(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +v_vec(3)*gradB_curr(1,3))*dl_norm
         k_1v(2) = (v_vec(1)*gradB_curr(2,1)+v_vec(2)*gradB_curr(2,2)/pos_0out(1) &
-                  +v_vec(3)*gradB_curr(2,3)/r_sin_th+(v_vec(2)*B_curr(1)-v_vec(1)*B_curr(2) &
-                  )/pos_0out(1))*dl_norm
+                  +v_vec(3)*gradB_curr(2,3)+(v_vec(2)*B_curr(1)-v_vec(1)*B_curr(2)) &
+                  /pos_0out(1))*dl_norm
         k_1v(3) = (v_vec(1)*gradB_curr(3,1)+v_vec(2)*gradB_curr(3,2)/pos_0out(1) &
-                  +v_vec(3)*gradB_curr(3,3)/r_sin_th+(v_vec(3)*B_curr(1)-v_vec(1)*B_curr(3) &
-                  +(v_vec(3)*B_curr(2)-v_vec(2)*B_curr(3))*cot_th)/pos_0out(1))*dl_norm
+                  +v_vec(3)*gradB_curr(3,3))*dl_norm
 
         pos_1in(:) = pos_in(:) + 0.5_num*k_1(:)
         u1(:) = u_vec(:) + 0.5_num*k_1u(:)
@@ -5678,27 +5671,23 @@ module UFiT_Functions_Fortran
         call B_gradB_interp(idx_in, pos_1out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
-        r_sin_th = pos_1out(1)*SIN(pos_1out(2))
         k_2(1) = B_curr(1)*dl_norm
         k_2(2) = B_curr(2)*dl_norm/pos_1out(1)
         k_2(3) = B_curr(3)*dl_norm
-        cot_th = COS(pos_1out(2))/SIN(pos_1out(2))
         k_2u(1) = (u1(1)*gradB_curr(1,1)+u1(2)*gradB_curr(1,2)/pos_1out(1) &
-                  +u1(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +u1(3)*gradB_curr(1,3))*dl_norm
         k_2u(2) = (u1(1)*gradB_curr(2,1)+u1(2)*gradB_curr(2,2)/pos_1out(1) &
-                  +u1(3)*gradB_curr(2,3)/r_sin_th+(u1(2)*B_curr(1)-u1(1)*B_curr(2) &
-                  )/pos_1out(1))*dl_norm
+                  +u1(3)*gradB_curr(2,3)+(u1(2)*B_curr(1)-u1(1)*B_curr(2)) &
+                  /pos_1out(1))*dl_norm
         k_2u(3) = (u1(1)*gradB_curr(3,1)+u1(2)*gradB_curr(3,2)/pos_1out(1) &
-                  +u1(3)*gradB_curr(3,3)/r_sin_th+(u1(3)*B_curr(1)-u1(1)*B_curr(3) &
-                  +(u1(3)*B_curr(2)-u1(2)*B_curr(3))*cot_th)/pos_1out(1))*dl_norm
+                  +u1(3)*gradB_curr(3,3))*dl_norm
         k_2v(1) = (v1(1)*gradB_curr(1,1)+v1(2)*gradB_curr(1,2)/pos_1out(1) &
-                  +v1(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +v1(3)*gradB_curr(1,3))*dl_norm
         k_2v(2) = (v1(1)*gradB_curr(2,1)+v1(2)*gradB_curr(2,2)/pos_1out(1) &
-                  +v1(3)*gradB_curr(2,3)/r_sin_th+(v1(2)*B_curr(1)-v1(1)*B_curr(2) &
-                  )/pos_1out(1))*dl_norm
+                  +v1(3)*gradB_curr(2,3)+(v1(2)*B_curr(1)-v1(1)*B_curr(2)) &
+                  /pos_1out(1))*dl_norm
         k_2v(3) = (v1(1)*gradB_curr(3,1)+v1(2)*gradB_curr(3,2)/pos_1out(1) &
-                  +v1(3)*gradB_curr(3,3)/r_sin_th+(v1(3)*B_curr(1)-v1(1)*B_curr(3) &
-                  +(v1(3)*B_curr(2)-v1(2)*B_curr(3))*cot_th)/pos_1out(1))*dl_norm
+                  +v1(3)*gradB_curr(3,3))*dl_norm
 
         pos_2in(:) = pos_in(:) + 0.5_num*k_2(:)
         u2(:) = u_vec(:) + 0.5_num*k_2u(:)
@@ -5707,27 +5696,23 @@ module UFiT_Functions_Fortran
         call B_gradB_interp(idx_in, pos_2out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
-        r_sin_th = pos_2out(1)*SIN(pos_2out(2))
         k_3(1) = B_curr(1)*dl_norm
         k_3(2) = B_curr(2)*dl_norm/pos_2out(1)
         k_3(3) = B_curr(3)*dl_norm
-        cot_th = COS(pos_2out(2))/SIN(pos_2out(2))
         k_3u(1) = (u2(1)*gradB_curr(1,1)+u2(2)*gradB_curr(1,2)/pos_2out(1) &
-                  +u2(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +u2(3)*gradB_curr(1,3))*dl_norm
         k_3u(2) = (u2(1)*gradB_curr(2,1)+u2(2)*gradB_curr(2,2)/pos_2out(1) &
-                  +u2(3)*gradB_curr(2,3)/r_sin_th+(u2(2)*B_curr(1)-u2(1)*B_curr(2) &
-                  )/pos_2out(1))*dl_norm
+                  +u2(3)*gradB_curr(2,3)+(u2(2)*B_curr(1)-u2(1)*B_curr(2)) &
+                  /pos_2out(1))*dl_norm
         k_3u(3) = (u2(1)*gradB_curr(3,1)+u2(2)*gradB_curr(3,2)/pos_2out(1) &
-                  +u2(3)*gradB_curr(3,3)/r_sin_th+(u2(3)*B_curr(1)-u2(1)*B_curr(3) &
-                  +(u2(3)*B_curr(2)-u2(2)*B_curr(3))*cot_th)/pos_2out(1))*dl_norm
+                  +u2(3)*gradB_curr(3,3))*dl_norm
         k_3v(1) = (v2(1)*gradB_curr(1,1)+v2(2)*gradB_curr(1,2)/pos_2out(1) &
-                  +v2(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +v2(3)*gradB_curr(1,3))*dl_norm
         k_3v(2) = (v2(1)*gradB_curr(2,1)+v2(2)*gradB_curr(2,2)/pos_2out(1) &
-                  +v2(3)*gradB_curr(2,3)/r_sin_th+(v2(2)*B_curr(1)-v2(1)*B_curr(2) &
-                  )/pos_2out(1))*dl_norm
+                  +v2(3)*gradB_curr(2,3)+(v2(2)*B_curr(1)-v2(1)*B_curr(2)) &
+                  /pos_2out(1))*dl_norm
         k_3v(3) = (v2(1)*gradB_curr(3,1)+v2(2)*gradB_curr(3,2)/pos_2out(1) &
-                  +v2(3)*gradB_curr(3,3)/r_sin_th+(v2(3)*B_curr(1)-v2(1)*B_curr(3) &
-                  +(v2(3)*B_curr(2)-v2(2)*B_curr(3))*cot_th)/pos_2out(1))*dl_norm
+                  +v2(3)*gradB_curr(3,3))*dl_norm
 
         pos_3in(:) = pos_in(:) + k_3(:)
         u3(:) = u_vec(:) + k_3u(:)
@@ -5736,27 +5721,23 @@ module UFiT_Functions_Fortran
         call B_gradB_interp(idx_in, pos_3out, B_curr, gradB_curr)
         mod_B = SQRT(B_curr(1)**2+B_curr(2)**2+B_curr(3)**2)
         dl_norm = dl/mod_B !Step size scaled by B
-        r_sin_th = pos_3out(1)*SIN(pos_3out(2))
         k_4(1) = B_curr(1)*dl_norm
         k_4(2) = B_curr(2)*dl_norm/pos_3out(1)
         k_4(3) = B_curr(3)*dl_norm
-        cot_th = COS(pos_3out(2))/SIN(pos_3out(2))
         k_4u(1) = (u3(1)*gradB_curr(1,1)+u3(2)*gradB_curr(1,2)/pos_3out(1) &
-                  +u3(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +u3(3)*gradB_curr(1,3))*dl_norm
         k_4u(2) = (u3(1)*gradB_curr(2,1)+u3(2)*gradB_curr(2,2)/pos_3out(1) &
-                  +u3(3)*gradB_curr(2,3)/r_sin_th+(u3(2)*B_curr(1)-u3(1)*B_curr(2) &
-                  )/pos_3out(1))*dl_norm
+                  +u3(3)*gradB_curr(2,3)+(u3(2)*B_curr(1)-u3(1)*B_curr(2)) &
+                  /pos_3out(1))*dl_norm
         k_4u(3) = (u3(1)*gradB_curr(3,1)+u3(2)*gradB_curr(3,2)/pos_3out(1) &
-                  +u3(3)*gradB_curr(3,3)/r_sin_th+(u3(3)*B_curr(1)-u3(1)*B_curr(3) &
-                  +(u3(3)*B_curr(2)-u3(2)*B_curr(3))*cot_th)/pos_3out(1))*dl_norm
+                  +u3(3)*gradB_curr(3,3))*dl_norm
         k_4v(1) = (v3(1)*gradB_curr(1,1)+v3(2)*gradB_curr(1,2)/pos_3out(1) &
-                  +v3(3)*gradB_curr(1,3)/r_sin_th)*dl_norm
+                  +v3(3)*gradB_curr(1,3))*dl_norm
         k_4v(2) = (v3(1)*gradB_curr(2,1)+v3(2)*gradB_curr(2,2)/pos_3out(1) &
-                  +v3(3)*gradB_curr(2,3)/r_sin_th+(v3(2)*B_curr(1)-v3(1)*B_curr(2) &
-                  )/pos_3out(1))*dl_norm
+                  +v3(3)*gradB_curr(2,3)+(v3(2)*B_curr(1)-v3(1)*B_curr(2)) &
+                  /pos_3out(1))*dl_norm
         k_4v(3) = (v3(1)*gradB_curr(3,1)+v3(2)*gradB_curr(3,2)/pos_3out(1) &
-                  +v3(3)*gradB_curr(3,3)/r_sin_th+(v3(3)*B_curr(1)-v3(1)*B_curr(3) &
-                  +(v3(3)*B_curr(2)-v3(2)*B_curr(3))*cot_th)/pos_3out(1))*dl_norm
+                  +v3(3)*gradB_curr(3,3))*dl_norm
 
         pos_out(:) = pos_in(:) + (k_1(:) + 2.0_num*k_2(:) + 2.0_num*k_3(:) + k_4(:))/6.0_num
         call check_position(pos_out,pos_3out,keep_running)

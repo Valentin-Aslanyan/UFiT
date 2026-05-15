@@ -59,10 +59,10 @@ class USlip_call_input:	#input to call USlip from Python
 		self.return_output = False
 		self.j_grid = np.zeros((2,2,2,3),dtype="double")
 		self.sigma_grid = np.zeros((2,2,2,3),dtype="double")
-		self.sigmafac_grid = np.zeros((2,2,2,3),dtype="double")
+		self.sigmac_grid = np.zeros((2,2,2,3),dtype="double")
 		self.j_grid_ir = np.zeros((1,2,2,2,3),dtype="double")
 		self.sigma_grid_ir = np.zeros((1,2,2,2,3),dtype="double")
-		self.sigmafac_grid_ir = np.zeros((1,2,2,2,3),dtype="double")
+		self.sigmaalpha_grid_ir = np.zeros((1,2,2,2,3),dtype="double")
 
 
 def call_USlip(shared_lib_path,USlip_input):
@@ -182,11 +182,11 @@ def call_USlip(shared_lib_path,USlip_input):
 	if USlip_input.grid_regular==True or USlip_input.grid_regular==1:
 		USlip_input.j_grid = np.zeros((USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
 		USlip_input.sigma_grid = np.zeros((USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
-		USlip_input.sigmafac_grid = np.zeros((USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
+		USlip_input.sigmaalpha_grid = np.zeros((USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
 	else:
 		USlip_input.j_grid_ir = np.zeros((USlip_input.num_blocks,USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
 		USlip_input.sigma_grid_ir = np.zeros((USlip_input.num_blocks,USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
-		USlip_input.sigmafac_grid_ir = np.zeros((USlip_input.num_blocks,USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
+		USlip_input.sigmaalpha_grid_ir = np.zeros((USlip_input.num_blocks,USlip_input.sz3,USlip_input.sz2,USlip_input.sz1,3),dtype="double")
 
 
 	fortranlib.USlip_Python_Callable(ctypes.c_int(USlip_input.geometry), 
@@ -239,18 +239,18 @@ def call_USlip(shared_lib_path,USlip_input):
 					ctypes.c_int(bool_to_int(USlip_input.return_output)),
 					USlip_input.j_grid.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					USlip_input.sigma_grid.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
-					USlip_input.sigmafac_grid.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					USlip_input.sigmaalpha_grid.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					USlip_input.j_grid_ir.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					USlip_input.sigma_grid_ir.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
-					USlip_input.sigmafac_grid_ir.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
+					USlip_input.sigmaalpha_grid_ir.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), 
 					)
 
 	USlip_input.j_grid=USlip_input.j_grid.transpose(3,2,1,0)
 	USlip_input.sigma_grid=USlip_input.sigma_grid.transpose(3,2,1,0)
-	USlip_input.sigmafac_grid=USlip_input.sigmafac_grid.transpose(3,2,1,0)
+	USlip_input.sigmaalpha_grid=USlip_input.sigmaalpha_grid.transpose(3,2,1,0)
 	USlip_input.j_grid_ir=USlip_input.j_grid_ir.transpose(4,3,2,1,0)
 	USlip_input.sigma_grid_ir=USlip_input.sigma_grid_ir.transpose(4,3,2,1,0)
-	USlip_input.sigmafac_grid_ir=USlip_input.sigmafac_grid_ir.transpose(4,3,2,1,0)
+	USlip_input.sigmaalpha_grid_ir=USlip_input.sigmaalpha_grid_ir.transpose(4,3,2,1,0)
 
 	return USlip_input
 	
