@@ -5596,8 +5596,6 @@ module UFiT_Functions_Fortran
         k_1(1) = B_curr(1)*dl_norm
         k_1(2) = B_curr(2)*dl_norm/pos_0out(1)
         k_1(3) = B_curr(3)*dl_norm
-
-
         k_1u(1) = (u_vec(1)*gradB_curr(1,1)+u_vec(2)*gradB_curr(1,2)/pos_0out(1) &
                   +u_vec(3)*gradB_curr(1,3))*dl_norm
         k_1u(2) = (u_vec(1)*gradB_curr(2,1)+u_vec(2)*gradB_curr(2,2)/pos_0out(1) &
