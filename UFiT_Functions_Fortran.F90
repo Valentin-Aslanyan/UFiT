@@ -4263,18 +4263,18 @@ module UFiT_Functions_Fortran
 
           if ((pos_endpoints(3,idx_t) .lt. closed_fl_size)) then                 !one end at photosphere
             if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
-              fieldline_connection(idx_t) = 0   !Closed
+              connection_type = 0   !Closed
               Q_sign=1.0_num
             else                                                                 !second end away from photosphere
-              fieldline_connection(idx_t) = 1   !Open
+              connection_type = 1   !Open
               Q_sign=-1.0_num
             end if
           else                                                                   !one end away from photosphere
             if ((pos_endpoints(6,idx_t) .lt. closed_fl_size)) then               !second end at photosphere
-              fieldline_connection(idx_t) = 1   !Open
+              connection_type = 1   !Open
               Q_sign=-1.0_num
             else                                                                 !second end away from photosphere
-              fieldline_connection(idx_t) = 2   !disconnected
+              connection_type = 2   !disconnected
               Q_sign=-1.0_num
             end if
           end if
@@ -5755,10 +5755,10 @@ module UFiT_Functions_Fortran
 
           if ((pos_endpoints(3,idx_t) .lt. closed_fl_size) .or.        &
               (pos_endpoints(6,idx_t) .lt. closed_fl_size)) then                 !either end at bottom of Z
-            fieldline_connection(idx_t) = 1   !Open
+            connection_type = 1   !Open
             Q_sign=-1.0_num
           else                                                                   !neither end close to bottom of Z
-            fieldline_connection(idx_t) = 0   !Closed
+            connection_type = 0   !Closed
             Q_sign=1.0_num
           end if
 
