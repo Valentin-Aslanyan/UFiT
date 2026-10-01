@@ -36,6 +36,8 @@ module UFiT_Functions_Fortran
       !10 = DUMFRIC spherical;
       !20 = Lare3d cartesian;
       !30 = ARMS flicks, geometry from header;
+      !31 = ARMS bfield, geometry from header;
+      !40 = MPI-AMRVAC v5, geometry from file;
         Bfile_type = -1
         input_type = 0
         grid_regular = .true.
@@ -592,6 +594,8 @@ module UFiT_Functions_Fortran
             Bfile_type_actual = 10
           else if (TRIM(B_filename(LEN(TRIM(B_filename))-3:)) .eq. '.sdf') then
             Bfile_type_actual = 20
+          else if (TRIM(B_filename(LEN(TRIM(B_filename))-3:)) .eq. '.dat') then
+            Bfile_type_actual = 40
           else if (stp_idx .ge. 7) then
             if (B_filename(stp_idx-6:stp_idx-1) .eq. 'flicks') then
               Bfile_type_actual = 30
@@ -608,7 +612,7 @@ module UFiT_Functions_Fortran
             call EXIT(102)
           end if
         else if ((Bfile_type .eq. 0) .or. (Bfile_type .eq. 10) .or. (Bfile_type .eq. 20) .or. &
-                 (Bfile_type .eq. 30) .or. (Bfile_type .eq. 31)) then
+                 (Bfile_type .eq. 30) .or. (Bfile_type .eq. 31) .or. (Bfile_type .eq. 40)) then
           Bfile_type_actual = Bfile_type
         else
           print *, 'unrecognised Bfile type: ', Bfile_type
@@ -707,6 +711,9 @@ module UFiT_Functions_Fortran
           ELSE IF (Bfile_type_actual .eq. 31) THEN
             call load_ARMS_bfield
           END IF
+        else if (Bfile_type_actual .eq. 40) then
+          grid_regular = .false.
+          call load_MPIAMRVAC
         end if
 
       end subroutine load_Bfield
@@ -1777,6 +1784,198 @@ module UFiT_Functions_Fortran
         DEALLOCATE(data_temp64)
 
       end subroutine load_ARMS_bfield
+
+
+      subroutine load_MPIAMRVAC
+
+#ifndef MPI_OFFSET_KIND
+#define MPI_OFFSET_KIND 8
+#endif
+        INTEGER :: AMRVAC_unit, version_no, tree_offset, data_offset, nw, ndir, MAndim
+        INTEGER :: levmax, nleafs, nparents, MAit, idx_b1, idx_b2, idx_b3, n_params
+        INTEGER :: snapshotnext, slicenext, collapsenext
+        LOGICAL :: bfile_exists, swap_phi_z
+        REAL(8) :: global_time
+        REAL(8), DIMENSION(:), ALLOCATABLE :: xprobmin, xprobmax, parameters, dx0, dx
+        INTEGER, DIMENSION(:), ALLOCATABLE :: domain_nx, block_nx, refinement_level
+        INTEGER, DIMENSION(:), ALLOCATABLE :: n_ghost_lo, n_ghost_hi
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: spatial_index
+        INTEGER(MPI_OFFSET_KIND), DIMENSION(:), ALLOCATABLE :: offset_block
+        LOGICAL, DIMENSION(:), ALLOCATABLE :: MAperiodic, is_leaf
+        CHARACTER(len=16) :: MAstring
+        INTEGER :: idx_blk, idx1, idx2, idx3, blksz1, blksz2, blksz3
+        REAL(8), DIMENSION(:,:,:,:), ALLOCATABLE :: data_temp
+
+        inquire(file=B_filename, exist=bfile_exists)
+        IF (.not. bfile_exists) THEN
+          print *, 'Unable to open B field file (from MPI-AMRVAC)'
+          print *, 'Attemped to read filename: '
+          print *, TRIM(B_filename)
+          call EXIT(140)
+        END IF
+        open(newunit=AMRVAC_unit,file=B_filename,access='stream')
+      !Read header
+        read(AMRVAC_unit) version_no
+        read(AMRVAC_unit) tree_offset
+        read(AMRVAC_unit) data_offset
+        read(AMRVAC_unit) nw
+        read(AMRVAC_unit) ndir
+        read(AMRVAC_unit) MAndim
+        IF (MAndim .ne. 3) THEN
+          print *, 'Only 3 dimensions currently supported for MPI-AMRVAC'
+          call EXIT(141)
+        END IF
+        read(AMRVAC_unit) levmax
+        read(AMRVAC_unit) nleafs
+        read(AMRVAC_unit) nparents
+        read(AMRVAC_unit) MAit
+        ALLOCATE(xprobmin(MAndim))
+        ALLOCATE(xprobmax(MAndim))
+        ALLOCATE(domain_nx(MAndim))
+        ALLOCATE(block_nx(MAndim))
+        ALLOCATE(MAperiodic(MAndim))
+        ALLOCATE(dx0(MAndim))
+        ALLOCATE(dx(MAndim))
+        ALLOCATE(n_ghost_lo(MAndim))
+        ALLOCATE(n_ghost_hi(MAndim))
+
+        read(AMRVAC_unit) global_time
+        read(AMRVAC_unit) xprobmin
+        read(AMRVAC_unit) xprobmax
+        read(AMRVAC_unit) domain_nx
+        read(AMRVAC_unit) block_nx
+        sz_1 = block_nx(1)
+        sz_2 = block_nx(2)
+        sz_3 = block_nx(3)
+        ALLOCATE(grid1_ir(2,nleafs))
+        ALLOCATE(grid2_ir(2,nleafs))
+        ALLOCATE(grid3_ir(2,nleafs))
+        ALLOCATE(B_grid_ir(3,sz_1,sz_2,sz_3,nleafs))
+        read(AMRVAC_unit) MAperiodic
+        read(AMRVAC_unit) MAstring
+        read(AMRVAC_unit) grid_separate
+        IF (grid_separate) THEN
+          print *, 'Separate/staggered grid setting not yet implemented'
+          print *, 'for MPI-AMRVAC output file'
+          call EXIT(142)
+        END IF
+        !TODO : check actual phi,z order in polar vs cylindrical
+        swap_phi_z = .false.
+        IF (MAstring(1:9) .eq. 'Cartesian') THEN
+          geometry = 0
+          if (MAperiodic(1)) THEN
+            periodic_X = .true.
+          end if
+          if (MAperiodic(2)) THEN
+            periodic_Y = .true.
+          end if
+          if (MAperiodic(3)) THEN
+            periodic_Z = .true.
+          end if
+        ELSE IF (MAstring(1:9) .eq. 'spherical') THEN
+          geometry = 1
+          if (MAperiodic(3)) THEN
+            periodic_PHI = .true.
+          end if
+        ELSE IF (MAstring(1:5) .eq. 'polar') THEN
+          geometry = 2
+          if (MAperiodic(2)) THEN
+            periodic_PHI = .true.
+          end if
+          if (MAperiodic(3)) THEN
+            periodic_Z = .true.
+          end if
+        ELSE IF (MAstring(1:11) .eq. 'cylindrical') THEN
+          geometry = 2
+          swap_phi_z = .true.
+          if (MAperiodic(2)) THEN
+            periodic_Z = .true.
+          end if
+          if (MAperiodic(3)) THEN
+            periodic_PHI = .true.
+          end if
+        END IF
+
+        DO idx1 = 1,nw
+          read(AMRVAC_unit) MAstring
+          IF (MAstring(1:2) .eq. 'b1') THEN
+            idx_b1 = idx1
+          ELSE IF (MAstring(1:2) .eq. 'b2') THEN
+            idx_b2 = idx1
+          ELSE IF (MAstring(1:2) .eq. 'b3') THEN
+            idx_b3 = idx1
+          END IF
+        END DO
+
+        read(AMRVAC_unit) MAstring
+        read(AMRVAC_unit) n_params
+        ALLOCATE(parameters(n_params))
+        read(AMRVAC_unit) parameters
+        DO idx1 = 1,n_params
+          read(AMRVAC_unit) MAstring
+        END DO
+
+        read(AMRVAC_unit) snapshotnext
+        read(AMRVAC_unit) slicenext
+        read(AMRVAC_unit) collapsenext
+
+        call fseek(AMRVAC_unit,tree_offset,0)
+
+        ALLOCATE(is_leaf(nleafs+nparents))
+        ALLOCATE(refinement_level(nleafs))
+        ALLOCATE(spatial_index(MAndim,nleafs))
+        ALLOCATE(offset_block(nleafs))
+        read(AMRVAC_unit) is_leaf
+        read(AMRVAC_unit) refinement_level
+        read(AMRVAC_unit) spatial_index
+        read(AMRVAC_unit) offset_block
+
+        call fseek(AMRVAC_unit,data_offset,0)
+
+	dx0 = (xprobmax - xprobmin)/domain_nx
+
+        DO idx_blk = 1,nleafs
+          dx = dx0 / 2**(refinement_level(idx_blk) - 1)
+          grid1_ir(1,idx_blk) = xprobmin(1) + (spatial_index(1,idx_blk) - 1)*block_nx(1)*dx(1)
+          grid1_ir(2,idx_blk) = grid1_ir(1,idx_blk) + block_nx(1)*dx(1)
+          grid2_ir(1,idx_blk) = xprobmin(2) + (spatial_index(2,idx_blk) - 1)*block_nx(2)*dx(2)
+          grid2_ir(2,idx_blk) = grid2_ir(1,idx_blk) + block_nx(2)*dx(2)
+          grid3_ir(1,idx_blk) = xprobmin(3) + (spatial_index(3,idx_blk) - 1)*block_nx(3)*dx(3)
+          grid3_ir(2,idx_blk) = grid3_ir(1,idx_blk) + block_nx(3)*dx(3)
+
+          read(AMRVAC_unit) n_ghost_lo
+          read(AMRVAC_unit) n_ghost_hi
+          blksz1=(n_ghost_lo(1)+n_ghost_hi(1)+block_nx(1))
+          blksz2=(n_ghost_lo(2)+n_ghost_hi(2)+block_nx(2))
+          blksz3=(n_ghost_lo(3)+n_ghost_hi(3)+block_nx(3))
+
+          ALLOCATE(data_temp(blksz2,blksz3,blksz1,nw))
+          read(AMRVAC_unit) data_temp
+          DO idx3 = 1,sz_3
+            DO idx2 = 1,sz_2
+              DO idx1 = 1,sz_1
+                B_grid_ir(1,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,n_ghost_lo(1)+idx1,idx_b1)
+                B_grid_ir(2,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,n_ghost_lo(1)+idx1,idx_b2)
+                B_grid_ir(3,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,n_ghost_lo(1)+idx1,idx_b3)
+              END DO
+            END DO
+          END DO
+          DEALLOCATE(data_temp)
+        END DO
+
+        close(AMRVAC_unit)
+        DEALLOCATE(xprobmin)
+        DEALLOCATE(xprobmax)
+        DEALLOCATE(domain_nx)
+        DEALLOCATE(block_nx)
+        DEALLOCATE(MAperiodic)
+        DEALLOCATE(parameters)
+        DEALLOCATE(is_leaf)
+        DEALLOCATE(refinement_level)
+        DEALLOCATE(spatial_index)
+        DEALLOCATE(offset_block)
+
+      end subroutine load_MPIAMRVAC
 
 
       subroutine write_output
