@@ -1792,7 +1792,8 @@ module UFiT_Functions_Fortran
 #define MPI_OFFSET_KIND 8
 #endif
         INTEGER :: AMRVAC_unit, version_no, tree_offset, data_offset, nw, ndir, MAndim
-        INTEGER :: levmax, nleafs, nparents, MAit, idx_b1, idx_b2, idx_b3, n_params
+        INTEGER :: levmax, nleafs, nparents, MAit, n_params
+        INTEGER :: idx_b1, idx_b2, idx_b3, idx_c1, idx_c2, idx_c3
         INTEGER :: snapshotnext, slicenext, collapsenext
         LOGICAL :: bfile_exists, swap_phi_z
         REAL(8) :: global_time
@@ -1861,6 +1862,9 @@ module UFiT_Functions_Fortran
         END IF
         !TODO : check actual phi,z order in polar vs cylindrical
         swap_phi_z = .false.
+        idx_c1 = 1
+        idx_c2 = 2
+        idx_c3 = 3
         IF (MAstring(1:9) .eq. 'Cartesian') THEN
           geometry = 0
           if (MAperiodic(1)) THEN
@@ -1888,6 +1892,8 @@ module UFiT_Functions_Fortran
         ELSE IF (MAstring(1:11) .eq. 'cylindrical') THEN
           geometry = 2
           swap_phi_z = .true.
+          idx_c2 = 3
+          idx_c3 = 2
           if (MAperiodic(2)) THEN
             periodic_Z = .true.
           end if
@@ -1906,6 +1912,12 @@ module UFiT_Functions_Fortran
             idx_b3 = idx1
           END IF
         END DO
+
+        IF (swap_phi_z) THEN
+          idx1 = idx_b3
+          idx_b3 = idx_b2
+          idx_b2 = idx1
+        END IF
 
         read(AMRVAC_unit) MAstring
         read(AMRVAC_unit) n_params
@@ -1936,12 +1948,12 @@ module UFiT_Functions_Fortran
 
         DO idx_blk = 1,nleafs
           dx = dx0 / 2**(refinement_level(idx_blk) - 1)
-          grid1_ir(1,idx_blk) = xprobmin(1) + (spatial_index(1,idx_blk) - 1)*block_nx(1)*dx(1)
-          grid1_ir(2,idx_blk) = grid1_ir(1,idx_blk) + block_nx(1)*dx(1)
-          grid2_ir(1,idx_blk) = xprobmin(2) + (spatial_index(2,idx_blk) - 1)*block_nx(2)*dx(2)
-          grid2_ir(2,idx_blk) = grid2_ir(1,idx_blk) + block_nx(2)*dx(2)
-          grid3_ir(1,idx_blk) = xprobmin(3) + (spatial_index(3,idx_blk) - 1)*block_nx(3)*dx(3)
-          grid3_ir(2,idx_blk) = grid3_ir(1,idx_blk) + block_nx(3)*dx(3)
+          grid1_ir(1,idx_blk) = xprobmin(idx_c1) + (spatial_index(idx_c1,idx_blk) - 1)*block_nx(idx_c1)*dx(idx_c1)
+          grid1_ir(2,idx_blk) = grid1_ir(1,idx_blk) + block_nx(idx_c1)*dx(idx_c1)
+          grid2_ir(1,idx_blk) = xprobmin(idx_c2) + (spatial_index(idx_c2,idx_blk) - 1)*block_nx(idx_c2)*dx(idx_c2)
+          grid2_ir(2,idx_blk) = grid2_ir(1,idx_blk) + block_nx(idx_c2)*dx(idx_c2)
+          grid3_ir(1,idx_blk) = xprobmin(idx_c3) + (spatial_index(idx_c3,idx_blk) - 1)*block_nx(idx_c3)*dx(idx_c3)
+          grid3_ir(2,idx_blk) = grid3_ir(1,idx_blk) + block_nx(idx_c3)*dx(idx_c3)
 
           read(AMRVAC_unit) n_ghost_lo
           read(AMRVAC_unit) n_ghost_hi
@@ -1949,7 +1961,6 @@ module UFiT_Functions_Fortran
           blksz2=(n_ghost_lo(2)+n_ghost_hi(2)+block_nx(2))
           blksz3=(n_ghost_lo(3)+n_ghost_hi(3)+block_nx(3))
 
-          !ALLOCATE(data_temp(blksz2,blksz3,blksz1,nw))
           ALLOCATE(data_temp(blksz1,blksz2,blksz3,nw))
           read(AMRVAC_unit) data_temp
           DO idx3 = 1,sz_3
