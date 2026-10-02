@@ -1828,6 +1828,7 @@ module UFiT_Functions_Fortran
         END IF
         read(AMRVAC_unit) levmax
         read(AMRVAC_unit) nleafs
+        num_blocks = nleafs
         read(AMRVAC_unit) nparents
         read(AMRVAC_unit) MAit
         ALLOCATE(xprobmin(MAndim))
@@ -1848,10 +1849,10 @@ module UFiT_Functions_Fortran
         sz_1 = block_nx(1)
         sz_2 = block_nx(2)
         sz_3 = block_nx(3)
-        ALLOCATE(grid1_ir(2,nleafs))
-        ALLOCATE(grid2_ir(2,nleafs))
-        ALLOCATE(grid3_ir(2,nleafs))
-        ALLOCATE(B_grid_ir(3,sz_1,sz_2,sz_3,nleafs))
+        ALLOCATE(grid1_ir(2,num_blocks))
+        ALLOCATE(grid2_ir(2,num_blocks))
+        ALLOCATE(grid3_ir(2,num_blocks))
+        ALLOCATE(B_grid_ir(3,sz_1,sz_2,sz_3,num_blocks))
         read(AMRVAC_unit) MAperiodic
         read(AMRVAC_unit) MAstring
         read(AMRVAC_unit) grid_separate
@@ -1946,7 +1947,7 @@ module UFiT_Functions_Fortran
 
 	dx0 = (xprobmax - xprobmin)/domain_nx
 
-        DO idx_blk = 1,nleafs
+        DO idx_blk = 1,num_blocks
           dx = dx0 / 2**(refinement_level(idx_blk) - 1)
           grid1_ir(1,idx_blk) = xprobmin(idx_c1) + (spatial_index(idx_c1,idx_blk) - 1)*block_nx(idx_c1)*dx(idx_c1)
           grid1_ir(2,idx_blk) = grid1_ir(1,idx_blk) + block_nx(idx_c1)*dx(idx_c1)
