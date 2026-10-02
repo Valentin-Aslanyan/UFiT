@@ -1949,14 +1949,15 @@ module UFiT_Functions_Fortran
           blksz2=(n_ghost_lo(2)+n_ghost_hi(2)+block_nx(2))
           blksz3=(n_ghost_lo(3)+n_ghost_hi(3)+block_nx(3))
 
-          ALLOCATE(data_temp(blksz2,blksz3,blksz1,nw))
+          !ALLOCATE(data_temp(blksz2,blksz3,blksz1,nw))
+          ALLOCATE(data_temp(blksz1,blksz2,blksz3,nw))
           read(AMRVAC_unit) data_temp
           DO idx3 = 1,sz_3
             DO idx2 = 1,sz_2
               DO idx1 = 1,sz_1
-                B_grid_ir(1,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,n_ghost_lo(1)+idx1,idx_b1)
-                B_grid_ir(2,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,n_ghost_lo(1)+idx1,idx_b2)
-                B_grid_ir(3,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,n_ghost_lo(1)+idx1,idx_b3)
+                B_grid_ir(1,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,idx_b1)
+                B_grid_ir(2,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,idx_b2)
+                B_grid_ir(3,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,idx_b3)
               END DO
             END DO
           END DO
