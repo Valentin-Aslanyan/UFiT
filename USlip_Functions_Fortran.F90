@@ -1951,6 +1951,222 @@ module USlip_Functions_Fortran
       end subroutine write_slipped_ARMS_bfield
 
 
+      subroutine write_slipped_MPIAMRVAC
+!TODO: this subroutine, flip axes after calculations working uniformly, ARMS logR integration, full AMRVAC tests - coords dims irreg blocks, unit testing pipeline
+!TODO: check actual phi,z order in polar vs cylindrical
+
+#ifndef MPI_OFFSET_KIND
+#define MPI_OFFSET_KIND 8
+#endif
+        INTEGER :: bfieldin_unit, bfieldout_unit, chunksize, bytestoread
+        INTEGER :: version_no, tree_offset, data_offset, nw, ndir, MAndim
+        INTEGER :: levmax, nleafs, nparents, MAit, n_params
+        INTEGER :: snapshotnext, slicenext, collapsenext
+        REAL(8) :: global_time
+        REAL(8), DIMENSION(:), ALLOCATABLE :: xprobmin, xprobmax, parameters
+        INTEGER, DIMENSION(:), ALLOCATABLE :: domain_nx, block_nx, refinement_level
+        INTEGER, DIMENSION(:), ALLOCATABLE :: n_ghost_lo, n_ghost_hi
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: spatial_index
+        INTEGER(MPI_OFFSET_KIND), DIMENSION(:), ALLOCATABLE :: offset_block
+        LOGICAL, DIMENSION(:), ALLOCATABLE :: MAperiodic, is_leaf
+        CHARACTER(len=16) :: MAstring
+        INTEGER :: idx_blk, idx1, idx2, idx3, blksz1, blksz2, blksz3
+        CHARACTER, DIMENSION(:), ALLOCATABLE :: tempdata
+        REAL(8), DIMENSION(:,:,:,:), ALLOCATABLE :: data_temp1, data_temp2
+
+        open(newunit=bfieldin_unit,file=B_filename,access='stream')
+        open(newunit=bfieldout_unit,file=out_filename,access='stream')
+
+        read(bfieldin_unit) version_no
+        write(bfieldout_unit) version_no
+        read(bfieldin_unit) tree_offset
+        write(bfieldout_unit) tree_offset + 9*16
+        read(bfieldin_unit) data_offset
+        write(bfieldout_unit) data_offset + 9*16
+        read(bfieldin_unit) nw
+        write(bfieldout_unit) nw+9
+        read(bfieldin_unit) ndir
+        write(bfieldout_unit) ndir
+        read(bfieldin_unit) MAndim
+        write(bfieldout_unit) MAndim
+        read(bfieldin_unit) levmax
+        write(bfieldout_unit) levmax
+        read(bfieldin_unit) nleafs
+        write(bfieldout_unit) nleafs
+        read(bfieldin_unit) nparents
+        write(bfieldout_unit) nparents
+        read(bfieldin_unit) MAit
+        write(bfieldout_unit) MAit
+
+        ALLOCATE(xprobmin(MAndim))
+        ALLOCATE(xprobmax(MAndim))
+        ALLOCATE(domain_nx(MAndim))
+        ALLOCATE(block_nx(MAndim))
+        ALLOCATE(MAperiodic(MAndim))
+        ALLOCATE(n_ghost_lo(MAndim))
+        ALLOCATE(n_ghost_hi(MAndim))
+
+        read(bfieldin_unit) global_time
+        write(bfieldout_unit) global_time
+        read(bfieldin_unit) xprobmin
+        write(bfieldout_unit) xprobmin
+        read(bfieldin_unit) xprobmax
+        write(bfieldout_unit) xprobmax
+        read(bfieldin_unit) domain_nx
+        write(bfieldout_unit) domain_nx
+        read(bfieldin_unit) block_nx
+        write(bfieldout_unit) block_nx
+        read(bfieldin_unit) MAperiodic
+        write(bfieldout_unit) MAperiodic
+        read(bfieldin_unit) MAstring
+        write(bfieldout_unit) MAstring
+        read(bfieldin_unit) grid_separate
+        write(bfieldout_unit) grid_separate
+
+        DO idx1 = 1,nw
+          read(bfieldin_unit) MAstring
+          write(bfieldout_unit) MAstring
+        END DO
+        MAstring = 'curlb1          '
+        write(bfieldout_unit) MAstring
+        MAstring = 'curlb2          '
+        write(bfieldout_unit) MAstring
+        MAstring = 'curlb3          '
+        write(bfieldout_unit) MAstring
+        MAstring = 'Sigma1          '
+        write(bfieldout_unit) MAstring
+        MAstring = 'Sigma2          '
+        write(bfieldout_unit) MAstring
+        MAstring = 'Sigma3          '
+        write(bfieldout_unit) MAstring
+        MAstring = 'SigmaAlpha1     '
+        write(bfieldout_unit) MAstring
+        MAstring = 'SigmaAlpha2     '
+        write(bfieldout_unit) MAstring
+        MAstring = 'SigmaAlpha3     '
+        write(bfieldout_unit) MAstring
+
+        read(bfieldin_unit) MAstring
+        write(bfieldout_unit) MAstring
+        read(bfieldin_unit) n_params
+        write(bfieldout_unit) n_params
+        ALLOCATE(parameters(n_params))
+        read(bfieldin_unit) parameters
+        write(bfieldout_unit) parameters
+        DO idx1 = 1,n_params
+          read(bfieldin_unit) MAstring
+          write(bfieldout_unit) MAstring
+        END DO
+
+        read(bfieldin_unit) snapshotnext
+        write(bfieldout_unit) snapshotnext
+        read(bfieldin_unit) slicenext
+        write(bfieldout_unit) slicenext
+        read(bfieldin_unit) collapsenext
+        write(bfieldout_unit) collapsenext
+
+        bytestoread = tree_offset - ftell(bfieldin_unit)
+        if (bytestoread .gt. 0) then
+          chunksize=MIN(4096,bytestoread)
+          ALLOCATE(tempdata(chunksize))
+          DO WHILE (bytestoread .gt. 0)
+            if (chunksize .gt. bytestoread) then
+              chunksize=bytestoread
+              DEALLOCATE(tempdata)
+              ALLOCATE(tempdata(chunksize))
+            end if
+            read(bfieldin_unit) tempdata
+            write(bfieldout_unit) tempdata
+            bytestoread = bytestoread - chunksize
+          END DO
+          DEALLOCATE(tempdata)
+        end if
+
+        ALLOCATE(is_leaf(nleafs+nparents))
+        ALLOCATE(refinement_level(nleafs))
+        ALLOCATE(spatial_index(MAndim,nleafs))
+        ALLOCATE(offset_block(nleafs))
+        read(bfieldin_unit) is_leaf
+        write(bfieldout_unit) is_leaf
+        read(bfieldin_unit) refinement_level
+        write(bfieldout_unit) refinement_level
+        read(bfieldin_unit) spatial_index
+        write(bfieldout_unit) spatial_index
+        read(bfieldin_unit) offset_block
+        DO idx_blk = 1,num_blocks
+          offset_block(idx_blk) = data_offset + 9*16 + (idx_blk-1)*8*(nw+9) &
+          *(n_ghost_lo(1)+n_ghost_hi(1)+block_nx(1))*(n_ghost_lo(2)+n_ghost_hi(2)+block_nx(2)) &
+          *(n_ghost_lo(3)+n_ghost_hi(3)+block_nx(3)) + (idx_blk-1)*8*MAndim
+        END DO
+        write(bfieldout_unit) offset_block
+
+        bytestoread = data_offset - ftell(bfieldin_unit)
+        if (bytestoread .gt. 0) then
+          chunksize=MIN(4096,bytestoread)
+          ALLOCATE(tempdata(chunksize))
+          DO WHILE (bytestoread .gt. 0)
+            if (chunksize .gt. bytestoread) then
+              chunksize=bytestoread
+              DEALLOCATE(tempdata)
+              ALLOCATE(tempdata(chunksize))
+            end if
+            read(bfieldin_unit) tempdata
+            write(bfieldout_unit) tempdata
+            bytestoread = bytestoread - chunksize
+          END DO
+          DEALLOCATE(tempdata)
+        end if
+
+        DO idx_blk = 1,num_blocks
+          read(bfieldin_unit) n_ghost_lo
+          write(bfieldout_unit) n_ghost_lo
+          read(bfieldin_unit) n_ghost_hi
+          write(bfieldout_unit) n_ghost_hi
+
+          blksz1=(n_ghost_lo(1)+n_ghost_hi(1)+block_nx(1))
+          blksz2=(n_ghost_lo(2)+n_ghost_hi(2)+block_nx(2))
+          blksz3=(n_ghost_lo(3)+n_ghost_hi(3)+block_nx(3))
+
+          ALLOCATE(data_temp1(blksz1,blksz2,blksz3,nw))
+          ALLOCATE(data_temp2(blksz1,blksz2,blksz3,nw+9))
+          data_temp2 = 0.0
+          read(bfieldin_unit) data_temp1
+          data_temp2(:,:,:,1:nw) = data_temp1(:,:,:,:)
+          DO idx3 = 1,sz_3
+            DO idx2 = 1,sz_2
+              DO idx1 = 1,sz_1
+                data_temp2(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,nw+1:nw+3) &
+                          = j_grid_ir(:,idx1,idx2,idx3,idx_blk)
+                data_temp2(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,nw+4:nw+6) &
+                          = sigma_grid_ir(:,idx1,idx2,idx3,idx_blk)
+                data_temp2(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,nw+7:nw+9) &
+                          = sigmaalpha_grid_ir(:,idx1,idx2,idx3,idx_blk)
+              END DO
+            END DO
+          END DO
+          write(bfieldout_unit) data_temp2
+          DEALLOCATE(data_temp1)
+          DEALLOCATE(data_temp2)
+        END DO
+
+        close(bfieldin_unit)
+        close(bfieldout_unit)
+        DEALLOCATE(xprobmin)
+        DEALLOCATE(xprobmax)
+        DEALLOCATE(domain_nx)
+        DEALLOCATE(block_nx)
+        DEALLOCATE(MAperiodic)
+        DEALLOCATE(n_ghost_lo)
+        DEALLOCATE(n_ghost_hi)
+        DEALLOCATE(parameters)
+        DEALLOCATE(is_leaf)
+        DEALLOCATE(refinement_level)
+        DEALLOCATE(spatial_index)
+        DEALLOCATE(offset_block)
+
+      end subroutine write_slipped_MPIAMRVAC
+
+
       subroutine write_slip_output
 
         LOGICAL :: stop_found
@@ -1990,6 +2206,8 @@ module USlip_Functions_Fortran
           call write_slipped_ARMS_flicks
         ELSE IF (Bfile_type_actual .eq. 31) THEN
           call write_slipped_ARMS_bfield
+        ELSE IF (Bfile_type_actual .eq. 40) THEN
+          call write_slipped_MPIAMRVAC
         END IF
 
       end subroutine write_slip_output

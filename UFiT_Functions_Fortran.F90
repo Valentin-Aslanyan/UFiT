@@ -1793,7 +1793,7 @@ module UFiT_Functions_Fortran
 #endif
         INTEGER :: AMRVAC_unit, version_no, tree_offset, data_offset, nw, ndir, MAndim
         INTEGER :: levmax, nleafs, nparents, MAit, n_params
-        INTEGER :: idx_b1, idx_b2, idx_b3, idx_c1, idx_c2, idx_c3
+        INTEGER :: idx_b1=-1, idx_b2=-2, idx_b3=-3, idx_c1, idx_c2, idx_c3
         INTEGER :: snapshotnext, slicenext, collapsenext
         LOGICAL :: bfile_exists, swap_phi_z
         REAL(8) :: global_time
@@ -1861,7 +1861,6 @@ module UFiT_Functions_Fortran
           print *, 'for MPI-AMRVAC output file'
           call EXIT(142)
         END IF
-        !TODO : check actual phi,z order in polar vs cylindrical
         swap_phi_z = .false.
         idx_c1 = 1
         idx_c2 = 2
@@ -1914,6 +1913,11 @@ module UFiT_Functions_Fortran
           END IF
         END DO
 
+        IF ((idx_b1 .lt. 1) .or. (idx_b2 .lt. 1) .or. (idx_b3 .lt. 1)) THEN
+          print *, 'All 3 components of B-field not found in MPI-AMRVAC file, exiting'
+          call EXIT(143)
+        END IF
+
         IF (swap_phi_z) THEN
           idx1 = idx_b3
           idx_b3 = idx_b2
@@ -1949,11 +1953,14 @@ module UFiT_Functions_Fortran
 
         DO idx_blk = 1,num_blocks
           dx = dx0 / 2**(refinement_level(idx_blk) - 1)
-          grid1_ir(1,idx_blk) = xprobmin(idx_c1) + (spatial_index(idx_c1,idx_blk) - 1)*block_nx(idx_c1)*dx(idx_c1)
+          grid1_ir(1,idx_blk) = xprobmin(idx_c1) + (spatial_index(idx_c1,idx_blk) - 1) &
+                                                   *block_nx(idx_c1)*dx(idx_c1)
           grid1_ir(2,idx_blk) = grid1_ir(1,idx_blk) + block_nx(idx_c1)*dx(idx_c1)
-          grid2_ir(1,idx_blk) = xprobmin(idx_c2) + (spatial_index(idx_c2,idx_blk) - 1)*block_nx(idx_c2)*dx(idx_c2)
+          grid2_ir(1,idx_blk) = xprobmin(idx_c2) + (spatial_index(idx_c2,idx_blk) - 1) &
+                                                   *block_nx(idx_c2)*dx(idx_c2)
           grid2_ir(2,idx_blk) = grid2_ir(1,idx_blk) + block_nx(idx_c2)*dx(idx_c2)
-          grid3_ir(1,idx_blk) = xprobmin(idx_c3) + (spatial_index(idx_c3,idx_blk) - 1)*block_nx(idx_c3)*dx(idx_c3)
+          grid3_ir(1,idx_blk) = xprobmin(idx_c3) + (spatial_index(idx_c3,idx_blk) - 1) &
+                                                   *block_nx(idx_c3)*dx(idx_c3)
           grid3_ir(2,idx_blk) = grid3_ir(1,idx_blk) + block_nx(idx_c3)*dx(idx_c3)
 
           read(AMRVAC_unit) n_ghost_lo
@@ -1967,9 +1974,12 @@ module UFiT_Functions_Fortran
           DO idx3 = 1,sz_3
             DO idx2 = 1,sz_2
               DO idx1 = 1,sz_1
-                B_grid_ir(1,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,idx_b1)
-                B_grid_ir(2,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,idx_b2)
-                B_grid_ir(3,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2)+idx2,n_ghost_lo(3)+idx3,idx_b3)
+                B_grid_ir(1,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2) &
+                                                              +idx2,n_ghost_lo(3)+idx3,idx_b1)
+                B_grid_ir(2,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2) &
+                                                              +idx2,n_ghost_lo(3)+idx3,idx_b2)
+                B_grid_ir(3,idx1,idx2,idx3,idx_blk)=data_temp(n_ghost_lo(1)+idx1,n_ghost_lo(2) &
+                                                              +idx2,n_ghost_lo(3)+idx3,idx_b3)
               END DO
             END DO
           END DO
@@ -1982,6 +1992,10 @@ module UFiT_Functions_Fortran
         DEALLOCATE(domain_nx)
         DEALLOCATE(block_nx)
         DEALLOCATE(MAperiodic)
+        DEALLOCATE(dx0)
+        DEALLOCATE(dx)
+        DEALLOCATE(n_ghost_lo)
+        DEALLOCATE(n_ghost_hi)
         DEALLOCATE(parameters)
         DEALLOCATE(is_leaf)
         DEALLOCATE(refinement_level)
