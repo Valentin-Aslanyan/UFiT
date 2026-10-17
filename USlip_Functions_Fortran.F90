@@ -25,7 +25,7 @@ module USlip_Functions_Fortran
       REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: sigma_grid
       REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: sigmaalpha_grid
       !Irregular coordinate grid (e.g. ARMS blocks)
-      INTEGER, DIMENSION(:,:), ALLOCATABLE :: block_neighbours_ir
+      INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: block_neighbours_ir
       REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: j_grid_ir
       REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: curlj_grid_ir
       REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: alpha_grid_ir
@@ -264,21 +264,24 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: grad_out(3)
 
-        INTEGER :: adj(6)
+        INTEGER :: adj(2,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call regular_grid_adjacent(pt_indices, periodic_X, periodic_Y, periodic_Z, adj)
+        call resolve_regular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                           grid2_down, grid3_up, grid3_down)
 
-        grad_out(1) = (grid_data(adj(1),pt_indices(2),pt_indices(3)) &
-                      -grid_data(adj(2),pt_indices(2),pt_indices(3))) &
-                      /(grid1(adj(1)) - grid1(adj(2)))
+        grad_out(1) = (grid_data(adj(1,1),pt_indices(2),pt_indices(3)) &
+                      -grid_data(adj(1,2),pt_indices(2),pt_indices(3))) &
+                      /(grid1_up - grid1_down)
 
-        grad_out(2) = (grid_data(pt_indices(1),adj(3),pt_indices(3)) &
-                      -grid_data(pt_indices(1),adj(4),pt_indices(3))) &
-                      /(grid2(adj(3)) - grid2(adj(4)))
+        grad_out(2) = (grid_data(pt_indices(1),adj(1,3),pt_indices(3)) &
+                      -grid_data(pt_indices(1),adj(1,4),pt_indices(3))) &
+                      /(grid2_up - grid2_down)
 
-        grad_out(3) = (grid_data(pt_indices(1),pt_indices(2),adj(5)) &
-                      -grid_data(pt_indices(1),pt_indices(2),adj(6))) &
-                      /(grid3(adj(5)) - grid3(adj(6)))
+        grad_out(3) = (grid_data(pt_indices(1),pt_indices(2),adj(1,5)) &
+                      -grid_data(pt_indices(1),pt_indices(2),adj(1,6))) &
+                      /(grid3_up - grid3_down)
 
       end subroutine regular_grad_cartesian
 
@@ -289,24 +292,27 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: grad_out(3)
 
-        INTEGER :: adj(6)
+        INTEGER :: adj(2,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call regular_grid_adjacent(pt_indices, .false., .false., periodic_PHI, adj)
+        call resolve_regular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                           grid2_down, grid3_up, grid3_down)
 
-        grad_out(1) = (grid_data(adj(1),pt_indices(2),pt_indices(3)) &
-                      -grid_data(adj(2),pt_indices(2),pt_indices(3))) &
-                      /(grid1(adj(1)) - grid1(adj(2)))
+        grad_out(1) = (grid_data(adj(1,1),pt_indices(2),pt_indices(3)) &
+                      -grid_data(adj(1,2),pt_indices(2),pt_indices(3))) &
+                      /(grid1_up - grid1_down)
 
-        grad_out(2) = 2.0_num/(grid1(adj(1)) + grid1(adj(2))) * &
-                      (grid_data(pt_indices(1),adj(3),pt_indices(3)) &
-                      -grid_data(pt_indices(1),adj(4),pt_indices(3))) &
-                      /(grid2(adj(3)) - grid2(adj(4)))
+        grad_out(2) = 2.0_num/(grid1_up + grid1_down) * &
+                      (grid_data(pt_indices(1),adj(1,3),pt_indices(3)) &
+                      -grid_data(pt_indices(1),adj(1,4),pt_indices(3))) &
+                      /(grid2_up - grid2_down)
 
-        grad_out(3) = 2.0_num/(grid1(adj(1)) + grid1(adj(2))) / &
-                      SIN(0.5_num*(grid2(adj(3)) + grid2(adj(4)))) * &
-                      (grid_data(pt_indices(1),pt_indices(2),adj(5)) &
-                      -grid_data(pt_indices(1),pt_indices(2),adj(6))) &
-                      /(grid3(adj(5)) - grid3(adj(6)))
+        grad_out(3) = 2.0_num/(grid1_up + grid1_down) / &
+                      SIN(0.5_num*(grid2_up + grid2_down)) * &
+                      (grid_data(pt_indices(1),pt_indices(2),adj(1,5)) &
+                      -grid_data(pt_indices(1),pt_indices(2),adj(1,6))) &
+                      /(grid3_up - grid3_down)
 
       end subroutine regular_grad_spherical
 
@@ -317,22 +323,25 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: grad_out(3)
 
-        INTEGER :: adj(6)
+        INTEGER :: adj(2,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call regular_grid_adjacent(pt_indices, .false., periodic_PHI, periodic_Z, adj)
+        call resolve_regular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                           grid2_down, grid3_up, grid3_down)
 
-        grad_out(1) = (grid_data(adj(1),pt_indices(2),pt_indices(3)) &
-                      -grid_data(adj(2),pt_indices(2),pt_indices(3))) &
-                      /(grid1(adj(1)) - grid1(adj(2)))
+        grad_out(1) = (grid_data(adj(1,1),pt_indices(2),pt_indices(3)) &
+                      -grid_data(adj(1,2),pt_indices(2),pt_indices(3))) &
+                      /(grid1_up - grid1_down)
 
-        grad_out(2) = 2.0_num/(grid1(adj(1)) + grid1(adj(2))) * &
-                      (grid_data(pt_indices(1),adj(3),pt_indices(3)) &
-                      -grid_data(pt_indices(1),adj(4),pt_indices(3))) &
-                      /(grid2(adj(3)) - grid2(adj(4)))
+        grad_out(2) = 2.0_num/(grid1_up + grid1_down) * &
+                      (grid_data(pt_indices(1),adj(1,3),pt_indices(3)) &
+                      -grid_data(pt_indices(1),adj(1,4),pt_indices(3))) &
+                      /(grid2_up - grid2_down)
 
-        grad_out(3) = (grid_data(pt_indices(1),pt_indices(2),adj(5)) &
-                      -grid_data(pt_indices(1),pt_indices(2),adj(6))) &
-                      /(grid3(adj(5)) - grid3(adj(6)))
+        grad_out(3) = (grid_data(pt_indices(1),pt_indices(2),adj(1,5)) &
+                      -grid_data(pt_indices(1),pt_indices(2),adj(1,6))) &
+                      /(grid3_up - grid3_down)
 
       end subroutine regular_grad_cylindrical
 
@@ -343,30 +352,33 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: curl_out(3)
 
-        INTEGER :: adj(6)
+        INTEGER :: adj(2,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call regular_grid_adjacent(pt_indices, periodic_X, periodic_Y, periodic_Z, adj)
+        call resolve_regular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                           grid2_down, grid3_up, grid3_down)
 
-        curl_out(1) =  (grid_data(3,pt_indices(1),adj(3),pt_indices(3)) &
-                       -grid_data(3,pt_indices(1),adj(4),pt_indices(3))) &
-                       /(grid2(adj(3)) - grid2(adj(4))) &
-                      -(grid_data(2,pt_indices(1),pt_indices(2),adj(5)) &
-                       -grid_data(2,pt_indices(1),pt_indices(2),adj(6))) &
-                       /(grid3(adj(5)) - grid3(adj(6)))
+        curl_out(1) =  (grid_data(3,pt_indices(1),adj(1,3),pt_indices(3)) &
+                       -grid_data(3,pt_indices(1),adj(1,4),pt_indices(3))) &
+                       /(grid2_up - grid2_down) &
+                      -(grid_data(2,pt_indices(1),pt_indices(2),adj(1,5)) &
+                       -grid_data(2,pt_indices(1),pt_indices(2),adj(1,6))) &
+                       /(grid3_up - grid3_down)
 
-        curl_out(2) =  (grid_data(1,pt_indices(1),pt_indices(2),adj(5)) &
-                       -grid_data(1,pt_indices(1),pt_indices(2),adj(6))) &
-                       /(grid3(adj(5)) - grid3(adj(6))) &
-                      -(grid_data(3,adj(1),pt_indices(2),pt_indices(3)) &
-                       -grid_data(3,adj(2),pt_indices(2),pt_indices(3))) &
-                       /(grid1(adj(1)) - grid1(adj(2)))
+        curl_out(2) =  (grid_data(1,pt_indices(1),pt_indices(2),adj(1,5)) &
+                       -grid_data(1,pt_indices(1),pt_indices(2),adj(1,6))) &
+                       /(grid3_up - grid3_down) &
+                      -(grid_data(3,adj(1,1),pt_indices(2),pt_indices(3)) &
+                       -grid_data(3,adj(1,2),pt_indices(2),pt_indices(3))) &
+                       /(grid1_up - grid1_down)
 
-        curl_out(3) =  (grid_data(2,adj(1),pt_indices(2),pt_indices(3)) &
-                       -grid_data(2,adj(2),pt_indices(2),pt_indices(3))) &
-                       /(grid1(adj(1)) - grid1(adj(2))) &
-                      -(grid_data(1,pt_indices(1),adj(3),pt_indices(3)) &
-                       -grid_data(1,pt_indices(1),adj(4),pt_indices(3))) &
-                       /(grid2(adj(3)) - grid2(adj(4)))
+        curl_out(3) =  (grid_data(2,adj(1,1),pt_indices(2),pt_indices(3)) &
+                       -grid_data(2,adj(1,2),pt_indices(2),pt_indices(3))) &
+                       /(grid1_up - grid1_down) &
+                      -(grid_data(1,pt_indices(1),adj(1,3),pt_indices(3)) &
+                       -grid_data(1,pt_indices(1),adj(1,4),pt_indices(3))) &
+                       /(grid2_up - grid2_down)
 
       end subroutine regular_curl_cartesian
 
@@ -377,34 +389,37 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: curl_out(3)
 
-        INTEGER :: adj(6)
+        INTEGER :: adj(2,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call regular_grid_adjacent(pt_indices, .false., .false., periodic_PHI, adj)
+        call resolve_regular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                           grid2_down, grid3_up, grid3_down)
 
-        curl_out(1) =  2.0_num/(grid1(adj(1)) + grid1(adj(2))) / &
-                       SIN(0.5_num*(grid2(adj(3)) + grid2(adj(4)))) * &
-                       (grid_data(3,pt_indices(1),adj(3),pt_indices(3))*SIN(grid2(adj(3))) &
-                       -grid_data(3,pt_indices(1),adj(4),pt_indices(3))*SIN(grid2(adj(4)))) &
-                       /(grid2(adj(3)) - grid2(adj(4))) &
-                      -(grid_data(2,pt_indices(1),pt_indices(2),adj(5)) &
-                       -grid_data(2,pt_indices(1),pt_indices(2),adj(6))) &
-                       /(grid3(adj(5)) - grid3(adj(6)))
+        curl_out(1) =  2.0_num/(grid1_up + grid1_down) / &
+                       SIN(0.5_num*(grid2_up + grid2_down)) * &
+                       (grid_data(3,pt_indices(1),adj(1,3),pt_indices(3))*SIN(grid2_up) &
+                       -grid_data(3,pt_indices(1),adj(1,4),pt_indices(3))*SIN(grid2_down)) &
+                       /(grid2_up - grid2_down) &
+                      -(grid_data(2,pt_indices(1),pt_indices(2),adj(1,5)) &
+                       -grid_data(2,pt_indices(1),pt_indices(2),adj(1,6))) &
+                       /(grid3_up - grid3_down)
 
-        curl_out(2) =  2.0_num/(grid1(adj(1)) + grid1(adj(2))) * &
-                       (grid_data(1,pt_indices(1),pt_indices(2),adj(5)) &
-                       -grid_data(1,pt_indices(1),pt_indices(2),adj(6))) &
-                       /(grid3(adj(5)) - grid3(adj(6)))/SIN(grid2(pt_indices(2))) &
-                      -(grid_data(3,adj(1),pt_indices(2),pt_indices(3))*grid1(adj(1)) &
-                       -grid_data(3,adj(2),pt_indices(2),pt_indices(3))*grid1(adj(2))) &
-                       /(grid1(adj(1)) - grid1(adj(2)))
+        curl_out(2) =  2.0_num/(grid1_up + grid1_down) * &
+                       (grid_data(1,pt_indices(1),pt_indices(2),adj(1,5)) &
+                       -grid_data(1,pt_indices(1),pt_indices(2),adj(1,6))) &
+                       /(grid3_up - grid3_down)/SIN(grid2(pt_indices(2))) &
+                      -(grid_data(3,adj(1,1),pt_indices(2),pt_indices(3))*grid1_up &
+                       -grid_data(3,adj(1,2),pt_indices(2),pt_indices(3))*grid1_down) &
+                       /(grid1_up - grid1_down)
 
-        curl_out(3) =  2.0_num/(grid1(adj(1)) + grid1(adj(2))) * &
-                       (grid_data(2,adj(1),pt_indices(2),pt_indices(3))*grid1(adj(1)) &
-                       -grid_data(2,adj(2),pt_indices(2),pt_indices(3))*grid1(adj(2))) &
-                       /(grid1(adj(1)) - grid1(adj(2))) &
-                      -(grid_data(1,pt_indices(1),adj(3),pt_indices(3)) &
-                       -grid_data(1,pt_indices(1),adj(4),pt_indices(3))) &
-                       /(grid2(adj(3)) - grid2(adj(4)))
+        curl_out(3) =  2.0_num/(grid1_up + grid1_down) * &
+                       (grid_data(2,adj(1,1),pt_indices(2),pt_indices(3))*grid1_up &
+                       -grid_data(2,adj(1,2),pt_indices(2),pt_indices(3))*grid1_down) &
+                       /(grid1_up - grid1_down) &
+                      -(grid_data(1,pt_indices(1),adj(1,3),pt_indices(3)) &
+                       -grid_data(1,pt_indices(1),adj(1,4),pt_indices(3))) &
+                       /(grid2_up - grid2_down)
 
       end subroutine regular_curl_spherical
 
@@ -415,31 +430,34 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: curl_out(3)
 
-        INTEGER :: adj(6)
+        INTEGER :: adj(2,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call regular_grid_adjacent(pt_indices, .false., periodic_PHI, periodic_Z, adj)
+        call resolve_regular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                           grid2_down, grid3_up, grid3_down)
 
-        curl_out(1) =  (grid_data(3,pt_indices(1),adj(3),pt_indices(3)) &
-                       -grid_data(3,pt_indices(1),adj(4),pt_indices(3))) &
-                       /(grid2(adj(3)) - grid2(adj(4)))/grid1(pt_indices(1)) &
-                      -(grid_data(2,pt_indices(1),pt_indices(2),adj(5)) &
-                       -grid_data(2,pt_indices(1),pt_indices(2),adj(6))) &
-                       /(grid3(adj(5)) - grid3(adj(6)))
+        curl_out(1) =  (grid_data(3,pt_indices(1),adj(1,3),pt_indices(3)) &
+                       -grid_data(3,pt_indices(1),adj(1,4),pt_indices(3))) &
+                       /(grid2_up - grid2_down)/grid1(pt_indices(1)) &
+                      -(grid_data(2,pt_indices(1),pt_indices(2),adj(1,5)) &
+                       -grid_data(2,pt_indices(1),pt_indices(2),adj(1,6))) &
+                       /(grid3_up - grid3_down)
 
-        curl_out(2) =  (grid_data(1,pt_indices(1),pt_indices(2),adj(5)) &
-                       -grid_data(1,pt_indices(1),pt_indices(2),adj(6))) &
-                       /(grid3(adj(5)) - grid3(adj(6))) &
-                      -(grid_data(3,adj(1),pt_indices(2),pt_indices(3)) &
-                       -grid_data(3,adj(2),pt_indices(2),pt_indices(3))) &
-                       /(grid1(adj(1)) - grid1(adj(2)))
+        curl_out(2) =  (grid_data(1,pt_indices(1),pt_indices(2),adj(1,5)) &
+                       -grid_data(1,pt_indices(1),pt_indices(2),adj(1,6))) &
+                       /(grid3_up - grid3_down) &
+                      -(grid_data(3,adj(1,1),pt_indices(2),pt_indices(3)) &
+                       -grid_data(3,adj(1,2),pt_indices(2),pt_indices(3))) &
+                       /(grid1_up - grid1_down)
 
-        curl_out(3) =  2.0_num/(grid1(adj(1)) + grid1(adj(2))) * &
-                       (grid_data(2,adj(1),pt_indices(2),pt_indices(3))*grid1(adj(1)) &
-                       -grid_data(2,adj(2),pt_indices(2),pt_indices(3))*grid1(adj(2))) &
-                       /(grid1(adj(1)) - grid1(adj(2))) &
-                      -(grid_data(1,pt_indices(1),adj(3),pt_indices(3)) &
-                       -grid_data(1,pt_indices(1),adj(4),pt_indices(3))) &
-                       /(grid2(adj(3)) - grid2(adj(4)))
+        curl_out(3) =  2.0_num/(grid1_up + grid1_down) * &
+                       (grid_data(2,adj(1,1),pt_indices(2),pt_indices(3))*grid1_up &
+                       -grid_data(2,adj(1,2),pt_indices(2),pt_indices(3))*grid1_down) &
+                       /(grid1_up - grid1_down) &
+                      -(grid_data(1,pt_indices(1),adj(1,3),pt_indices(3)) &
+                       -grid_data(1,pt_indices(1),adj(1,4),pt_indices(3))) &
+                       /(grid2_up - grid2_down)
 
       end subroutine regular_curl_cylindrical
 
@@ -447,72 +465,97 @@ module USlip_Functions_Fortran
       subroutine regular_grid_adjacent(pt_indices, periodic1, periodic2, periodic3, adj)
       !Each point on the grid is denoted by 3 indices:
       !(1) idx_grid1, (2) idx_grid2, (3) idx_grid3
-      !For a given such point with pt_indices, find the 6 adjacent points
-      !adj(1,2) has +,- in grid1
-      !adj(3,4) has +,- in grid2
-      !adj(5,6) has +,- in grid3
+      !For a given such point with pt_indices, find the 6 adjacent points and periodicities
+      !adj(1,1 or 2) has +,- in grid1
+      !adj(1,3 or 4) has +,- in grid2
+      !adj(1,5 or 6) has +,- in grid3
       !Return the same point if on edge and not periodic
+      !If periodic, put a +/-1 in periodicity
 
         INTEGER :: pt_indices(3)
         LOGICAL :: periodic1, periodic2, periodic3
-        INTEGER :: adj(6)
+        INTEGER :: adj(2,6)
+
+        adj(2,:) = 0
 
         if (pt_indices(1) .eq. 1) then
           if (periodic1) then
-            adj(2) = sz_1
+            adj(1,2) = sz_1
+            adj(2,2) = -1
           else
-            adj(2) = 1
+            adj(1,2) = 1
           end if
-          adj(1) = pt_indices(1)+1
+          adj(1,1) = pt_indices(1)+1
         else if (pt_indices(1) .eq. sz_1) then
           if (periodic1) then
-            adj(1) = 1
+            adj(1,1) = 1
+            adj(2,1) = 1
           else
-            adj(1) = sz_1
+            adj(1,1) = sz_1
           end if
-          adj(2) = pt_indices(1)-1
+          adj(1,2) = pt_indices(1)-1
         else
-          adj(1) = pt_indices(1)+1
-          adj(2) = pt_indices(1)-1
+          adj(1,1) = pt_indices(1)+1
+          adj(1,2) = pt_indices(1)-1
         end if
         if (pt_indices(2) .eq. 1) then
           if (periodic2) then
-            adj(4) = sz_2
+            adj(1,4) = sz_2
+            adj(2,4) = -1
           else
-            adj(4) = 1
+            adj(1,4) = 1
           end if
-          adj(3) = pt_indices(2)+1
+          adj(1,3) = pt_indices(2)+1
         else if (pt_indices(2) .eq. sz_2) then
           if (periodic2) then
-            adj(3) = 1
+            adj(1,3) = 1
+            adj(2,3) = 1
           else
-            adj(3) = sz_2
+            adj(1,3) = sz_2
           end if
-          adj(4) = pt_indices(2)-1
+          adj(1,4) = pt_indices(2)-1
         else
-          adj(3) = pt_indices(2)+1
-          adj(4) = pt_indices(2)-1
+          adj(1,3) = pt_indices(2)+1
+          adj(1,4) = pt_indices(2)-1
         end if
         if (pt_indices(3) .eq. 1) then
           if (periodic3) then
-            adj(6) = sz_3
+            adj(1,6) = sz_3
+            adj(2,6) = -1
           else
-            adj(6) = 1
+            adj(1,6) = 1
           end if
-          adj(5) = pt_indices(3)+1
+          adj(1,5) = pt_indices(3)+1
         else if (pt_indices(3) .eq. sz_3) then
           if (periodic3) then
-            adj(5) = 1
+            adj(1,5) = 1
+            adj(2,5) = 1
           else
-            adj(5) = sz_3
+            adj(1,5) = sz_3
           end if
-          adj(6) = pt_indices(3)-1
+          adj(1,6) = pt_indices(3)-1
         else
-          adj(5) = pt_indices(3)+1
-          adj(6) = pt_indices(3)-1
+          adj(1,5) = pt_indices(3)+1
+          adj(1,6) = pt_indices(3)-1
         end if
 
       end subroutine regular_grid_adjacent
+
+
+      subroutine resolve_regular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                               grid2_down, grid3_up, grid3_down)
+
+        INTEGER :: adj(2,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
+
+        grid1_up = grid1(adj(1,1)) + REAL(adj(2,1),num)*(grid1max-grid1min)
+        grid1_down = grid1(adj(1,2)) + REAL(adj(2,2),num)*(grid1max-grid1min)
+        grid2_up = grid2(adj(1,3)) + REAL(adj(2,3),num)*(grid2max-grid2min)
+        grid2_down = grid2(adj(1,4)) + REAL(adj(2,4),num)*(grid2max-grid2min)
+        grid3_up = grid3(adj(1,5)) + REAL(adj(2,5),num)*(grid3max-grid3min)
+        grid3_down = grid3(adj(1,6)) + REAL(adj(2,6),num)*(grid3max-grid3min)
+
+      end subroutine resolve_regular_periodicities
 
 
       subroutine irregular_grad_cartesian(pt_indices, grid_data, grad_out)
@@ -521,29 +564,24 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: grad_out(3)
 
-        INTEGER :: adj(4,6)
-        REAL(num) :: c_center(3), c_up(3), c_down(3), c_right(3), c_left(3), c_fwd(3), c_back(3)
+        INTEGER :: adj(5,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call irregular_grid_adjacent_points(pt_indices, adj)
-        call irregular_grid_point_coordinates(pt_indices,c_center)
-        call irregular_grid_point_coordinates(adj(:,1),c_up)
-        call irregular_grid_point_coordinates(adj(:,2),c_down)
-        call irregular_grid_point_coordinates(adj(:,3),c_right)
-        call irregular_grid_point_coordinates(adj(:,4),c_left)
-        call irregular_grid_point_coordinates(adj(:,5),c_fwd)
-        call irregular_grid_point_coordinates(adj(:,6),c_back)
+        call resolve_irregular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                             grid2_down, grid3_up, grid3_down)
 
         grad_out(1) = (grid_data(adj(2,1),adj(3,1),adj(4,1),adj(1,1)) &
                       -grid_data(adj(2,2),adj(3,2),adj(4,2),adj(1,2))) &
-                      /(c_up(1) - c_down(1))
+                      /(grid1_up - grid1_down)
 
         grad_out(2) = (grid_data(adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                       -grid_data(adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                      /(c_right(2) - c_left(2))
+                      /(grid2_up - grid2_down)
 
         grad_out(3) = (grid_data(adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                       -grid_data(adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                      /(c_fwd(3) - c_back(3))
+                      /(grid3_up - grid3_down)
 
       end subroutine irregular_grad_cartesian
 
@@ -554,32 +592,27 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: grad_out(3)
 
-        INTEGER :: adj(4,6)
-        REAL(num) :: c_center(3), c_up(3), c_down(3), c_right(3), c_left(3), c_fwd(3), c_back(3)
+        INTEGER :: adj(5,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call irregular_grid_adjacent_points(pt_indices, adj)
-        call irregular_grid_point_coordinates(pt_indices,c_center)
-        call irregular_grid_point_coordinates(adj(:,1),c_up)
-        call irregular_grid_point_coordinates(adj(:,2),c_down)
-        call irregular_grid_point_coordinates(adj(:,3),c_right)
-        call irregular_grid_point_coordinates(adj(:,4),c_left)
-        call irregular_grid_point_coordinates(adj(:,5),c_fwd)
-        call irregular_grid_point_coordinates(adj(:,6),c_back)
+        call resolve_irregular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                             grid2_down, grid3_up, grid3_down)
 
         grad_out(1) = (grid_data(adj(2,1),adj(3,1),adj(4,1),adj(1,1)) &
                       -grid_data(adj(2,2),adj(3,2),adj(4,2),adj(1,2))) &
-                      /(c_up(1) - c_down(1))
+                      /(grid1_up - grid1_down)
 
-        grad_out(2) = 2.0_num/(c_up(1) + c_down(1)) * &
+        grad_out(2) = 2.0_num/(grid1_up + grid1_down) * &
                       (grid_data(adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                       -grid_data(adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                      /(c_right(2) - c_left(2))
+                      /(grid2_up - grid2_down)
 
-        grad_out(3) = 2.0_num/(c_up(1) + c_down(1)) / &
-                      SIN(0.5_num*(c_right(2) + c_left(2))) * &
+        grad_out(3) = 2.0_num/(grid1_up + grid1_down) / &
+                      SIN(0.5_num*(grid2_up + grid2_down)) * &
                       (grid_data(adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                       -grid_data(adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                      /(c_fwd(3) - c_back(3))
+                      /(grid3_up - grid3_down)
 
       end subroutine irregular_grad_spherical
 
@@ -590,30 +623,25 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: grad_out(3)
 
-        INTEGER :: adj(4,6)
-        REAL(num) :: c_center(3), c_up(3), c_down(3), c_right(3), c_left(3), c_fwd(3), c_back(3)
+        INTEGER :: adj(5,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call irregular_grid_adjacent_points(pt_indices, adj)
-        call irregular_grid_point_coordinates(pt_indices,c_center)
-        call irregular_grid_point_coordinates(adj(:,1),c_up)
-        call irregular_grid_point_coordinates(adj(:,2),c_down)
-        call irregular_grid_point_coordinates(adj(:,3),c_right)
-        call irregular_grid_point_coordinates(adj(:,4),c_left)
-        call irregular_grid_point_coordinates(adj(:,5),c_fwd)
-        call irregular_grid_point_coordinates(adj(:,6),c_back)
+        call resolve_irregular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                             grid2_down, grid3_up, grid3_down)
 
         grad_out(1) = (grid_data(adj(2,1),adj(3,1),adj(4,1),adj(1,1)) &
                       -grid_data(adj(2,2),adj(3,2),adj(4,2),adj(1,2))) &
-                      /(c_up(1) - c_down(1))
+                      /(grid1_up - grid1_down)
 
-        grad_out(2) = 2.0_num/(c_up(1) + c_down(1)) * &
+        grad_out(2) = 2.0_num/(grid1_up + grid1_down) * &
                       (grid_data(adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                       -grid_data(adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                      /(c_right(2) - c_left(2))
+                      /(grid2_up - grid2_down)
 
         grad_out(3) = (grid_data(adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                       -grid_data(adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                      /(c_fwd(3) - c_back(3))
+                      /(grid3_up - grid3_down)
 
       end subroutine irregular_grad_cylindrical
 
@@ -624,38 +652,33 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: curl_out(3)
 
-        INTEGER :: adj(4,6)
-        REAL(num) :: c_center(3), c_up(3), c_down(3), c_right(3), c_left(3), c_fwd(3), c_back(3)
+        INTEGER :: adj(5,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call irregular_grid_adjacent_points(pt_indices, adj)
-        call irregular_grid_point_coordinates(pt_indices,c_center)
-        call irregular_grid_point_coordinates(adj(:,1),c_up)
-        call irregular_grid_point_coordinates(adj(:,2),c_down)
-        call irregular_grid_point_coordinates(adj(:,3),c_right)
-        call irregular_grid_point_coordinates(adj(:,4),c_left)
-        call irregular_grid_point_coordinates(adj(:,5),c_fwd)
-        call irregular_grid_point_coordinates(adj(:,6),c_back)
+        call resolve_irregular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                             grid2_down, grid3_up, grid3_down)
 
         curl_out(1) =  (grid_data(3,adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                        -grid_data(3,adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                       /(c_right(2) - c_left(2)) &
+                       /(grid2_up - grid2_down) &
                       -(grid_data(2,adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                        -grid_data(2,adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                       /(c_fwd(3) - c_back(3))
+                       /(grid3_up - grid3_down)
 
         curl_out(2) =  (grid_data(1,adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                        -grid_data(1,adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                       /(c_fwd(3) - c_back(3)) &
+                       /(grid3_up - grid3_down) &
                       -(grid_data(3,adj(2,1),adj(3,1),adj(4,1),adj(1,1)) &
                        -grid_data(3,adj(2,2),adj(3,2),adj(4,2),adj(1,2))) &
-                       /(c_up(1) - c_down(1))
+                       /(grid1_up - grid1_down)
 
         curl_out(3) =  (grid_data(2,adj(2,1),adj(3,1),adj(4,1),adj(1,1)) &
                        -grid_data(2,adj(2,2),adj(3,2),adj(4,2),adj(1,2))) &
-                       /(c_up(1) - c_down(1)) &
+                       /(grid1_up - grid1_down) &
                       -(grid_data(1,adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                        -grid_data(1,adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                       /(c_right(2) - c_left(2))
+                       /(grid2_up - grid2_down)
 
       end subroutine irregular_curl_cartesian
 
@@ -666,42 +689,39 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: curl_out(3)
 
-        INTEGER :: adj(4,6)
-        REAL(num) :: c_center(3), c_up(3), c_down(3), c_right(3), c_left(3), c_fwd(3), c_back(3)
+        INTEGER :: adj(5,6)
+        REAL(num) :: c_center(3)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call irregular_grid_adjacent_points(pt_indices, adj)
         call irregular_grid_point_coordinates(pt_indices,c_center)
-        call irregular_grid_point_coordinates(adj(:,1),c_up)
-        call irregular_grid_point_coordinates(adj(:,2),c_down)
-        call irregular_grid_point_coordinates(adj(:,3),c_right)
-        call irregular_grid_point_coordinates(adj(:,4),c_left)
-        call irregular_grid_point_coordinates(adj(:,5),c_fwd)
-        call irregular_grid_point_coordinates(adj(:,6),c_back)
+        call resolve_irregular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                             grid2_down, grid3_up, grid3_down)
 
-        curl_out(1) =  2.0_num/(c_up(1) + c_down(1)) / &
-                       SIN(0.5_num*(c_right(2) + c_left(2))) * &
-                      ((grid_data(3,adj(2,3),adj(3,3),adj(4,3),adj(1,3))*SIN(c_right(2)) &
-                       -grid_data(3,adj(2,4),adj(3,4),adj(4,4),adj(1,4))*SIN(c_left(2))) &
-                       /(c_right(2) - c_left(2)) &
+        curl_out(1) =  2.0_num/(grid1_up + grid1_down) / &
+                       SIN(0.5_num*(grid2_up + grid2_down)) * &
+                      ((grid_data(3,adj(2,3),adj(3,3),adj(4,3),adj(1,3))*SIN(grid2_up) &
+                       -grid_data(3,adj(2,4),adj(3,4),adj(4,4),adj(1,4))*SIN(grid2_down)) &
+                       /(grid2_up - grid2_down) &
                       -(grid_data(2,adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                        -grid_data(2,adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                       /(c_fwd(3) - c_back(3)))
+                       /(grid3_up - grid3_down))
 
-        curl_out(2) = 2.0_num/(c_up(1) + c_down(1)) * &
+        curl_out(2) = 2.0_num/(grid1_up + grid1_down) * &
                       ((grid_data(1,adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                        -grid_data(1,adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                       /(c_fwd(3) - c_back(3))/SIN(c_center(2)) &
-                      -(grid_data(3,adj(2,1),adj(3,1),adj(4,1),adj(1,1))*c_up(1) &
-                       -grid_data(3,adj(2,2),adj(3,2),adj(4,2),adj(1,2))*c_down(1)) &
-                       /(c_up(1) - c_down(1)))
+                       /(grid3_up - grid3_down)/SIN(c_center(2)) &
+                      -(grid_data(3,adj(2,1),adj(3,1),adj(4,1),adj(1,1))*grid1_up &
+                       -grid_data(3,adj(2,2),adj(3,2),adj(4,2),adj(1,2))*grid1_down) &
+                       /(grid1_up - grid1_down))
 
-        curl_out(3) = 2.0_num/(c_up(1) + c_down(1)) * &
-                      ((grid_data(2,adj(2,1),adj(3,1),adj(4,1),adj(1,1))*c_up(1) &
-                       -grid_data(2,adj(2,2),adj(3,2),adj(4,2),adj(1,2))*c_down(1)) &
-                       /(c_up(1) - c_down(1)) &
+        curl_out(3) = 2.0_num/(grid1_up + grid1_down) * &
+                      ((grid_data(2,adj(2,1),adj(3,1),adj(4,1),adj(1,1))*grid1_up &
+                       -grid_data(2,adj(2,2),adj(3,2),adj(4,2),adj(1,2))*grid1_down) &
+                       /(grid1_up - grid1_down) &
                       -(grid_data(1,adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                        -grid_data(1,adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                       /(c_right(2) - c_left(2)))
+                       /(grid2_up - grid2_down))
 
       end subroutine irregular_curl_spherical
 
@@ -712,47 +732,46 @@ module USlip_Functions_Fortran
         REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: grid_data
         REAL(num) :: curl_out(3)
 
-        INTEGER :: adj(4,6)
-        REAL(num) :: c_center(3), c_up(3), c_down(3), c_right(3), c_left(3), c_fwd(3), c_back(3)
+        INTEGER :: adj(5,6)
+        REAL(num) :: c_center(3)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
 
         call irregular_grid_adjacent_points(pt_indices, adj)
         call irregular_grid_point_coordinates(pt_indices,c_center)
-        call irregular_grid_point_coordinates(adj(:,1),c_up)
-        call irregular_grid_point_coordinates(adj(:,2),c_down)
-        call irregular_grid_point_coordinates(adj(:,3),c_right)
-        call irregular_grid_point_coordinates(adj(:,4),c_left)
-        call irregular_grid_point_coordinates(adj(:,5),c_fwd)
-        call irregular_grid_point_coordinates(adj(:,6),c_back)
+        call resolve_irregular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                             grid2_down, grid3_up, grid3_down)
 
         curl_out(1) =  (grid_data(3,adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                        -grid_data(3,adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                       /(c_right(2) - c_left(2))/c_center(1) &
+                       /(grid2_up - grid2_down)/c_center(1) &
                       -(grid_data(2,adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                        -grid_data(2,adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                       /(c_fwd(3) - c_back(3))
+                       /(grid3_up - grid3_down)
 
         curl_out(2) =  (grid_data(1,adj(2,5),adj(3,5),adj(4,5),adj(1,5)) &
                        -grid_data(1,adj(2,6),adj(3,6),adj(4,6),adj(1,6))) &
-                       /(c_fwd(3) - c_back(3)) &
+                       /(grid3_up - grid3_down) &
                       -(grid_data(3,adj(2,1),adj(3,1),adj(4,1),adj(1,1)) &
                        -grid_data(3,adj(2,2),adj(3,2),adj(4,2),adj(1,2))) &
-                       /(c_up(1) - c_down(1))
+                       /(grid1_up - grid1_down)
 
-        curl_out(3) =  2.0_num/(c_up(1) + c_down(1)) * &
-                      ((grid_data(2,adj(2,1),adj(3,1),adj(4,1),adj(1,1))*c_up(1) &
-                       -grid_data(2,adj(2,2),adj(3,2),adj(4,2),adj(1,2))*c_down(1)) &
-                       /(c_up(1) - c_down(1)) &
+        curl_out(3) =  2.0_num/(grid1_up + grid1_down) * &
+                      ((grid_data(2,adj(2,1),adj(3,1),adj(4,1),adj(1,1))*grid1_up &
+                       -grid_data(2,adj(2,2),adj(3,2),adj(4,2),adj(1,2))*grid1_down) &
+                       /(grid1_up - grid1_down) &
                       -(grid_data(1,adj(2,3),adj(3,3),adj(4,3),adj(1,3)) &
                        -grid_data(1,adj(2,4),adj(3,4),adj(4,4),adj(1,4))) &
-                       /(c_right(2) - c_left(2)))
+                       /(grid2_up - grid2_down))
 
       end subroutine irregular_curl_cylindrical
 
 
       subroutine compute_block_neighbours(periodic1, periodic2, periodic3)
       !Try to find the indices of neighbouring blocks
-      !block_neighbours_ir(1,i) | (2,i) are the +/- blocks in coord1 etc
+      !block_neighbours_ir(1,i,1) | (2,i,1) are the +/- blocks in coord1 etc
       !If no such neighbour exists, set the index to -1
+      !block_neighbours_ir(1,i,2) | (2,i,2) indicate if there is periodicity
+      !If +1, then the coordinate should be one period larger, if -1 then smaller
 
         LOGICAL :: periodic1, periodic2, periodic3
 
@@ -761,8 +780,9 @@ module USlip_Functions_Fortran
         LOGICAL :: neighbour4unset, neighbour5unset, neighbour6unset
         LOGICAL :: coord1aligned, coord2aligned, coord3aligned
 
-        ALLOCATE(block_neighbours_ir(6,num_blocks))
-        block_neighbours_ir(:,:) = -1
+        ALLOCATE(block_neighbours_ir(6,num_blocks,2))
+        block_neighbours_ir(:,:,1) = -1
+        block_neighbours_ir(:,:,2) = 0
 
       !$OMP parallel num_threads(num_proc) private(idx2, neighbour1unset, neighbour2unset, &
       !$OMP& neighbour3unset, neighbour4unset, neighbour5unset, neighbour6unset, coord1aligned, &
@@ -787,56 +807,62 @@ module USlip_Functions_Fortran
                                 .eq. grid3_ir(2,idx2)))
               if ((grid1_ir(2,idx) .eq. grid1_ir(1,idx2)) .and. coord2aligned .and. &
                    coord3aligned) then
-                block_neighbours_ir(1,idx) = idx2
+                block_neighbours_ir(1,idx,1) = idx2
                 neighbour1unset = .false.
               else if ((periodic1) .and. (grid1_ir(2,idx) .eq. grid1max) .and. &
                        (grid1_ir(1,idx2) .eq. grid1min)) then
-                block_neighbours_ir(1,idx) = idx2
+                block_neighbours_ir(1,idx,1) = idx2
+                block_neighbours_ir(1,idx,2) = 1
                 neighbour1unset = .false.
               end if
               if ((grid1_ir(1,idx) .eq. grid1_ir(2,idx2)) .and. coord2aligned .and. &
                    coord3aligned) then
-                block_neighbours_ir(2,idx) = idx2
+                block_neighbours_ir(2,idx,1) = idx2
                 neighbour2unset = .false.
               else if ((periodic1) .and. (grid1_ir(1,idx) .eq. grid1min) .and. &
                        (grid1_ir(2,idx2) .eq. grid1max)) then
-                block_neighbours_ir(2,idx) = idx2
+                block_neighbours_ir(2,idx,1) = idx2
+                block_neighbours_ir(2,idx,2) = -1
                 neighbour2unset = .false.
               end if
               if ((grid2_ir(2,idx) .eq. grid2_ir(1,idx2)) .and. coord1aligned .and. &
                    coord3aligned) then
-                block_neighbours_ir(3,idx) = idx2
+                block_neighbours_ir(3,idx,1) = idx2
                 neighbour3unset = .false.
               else if ((periodic2) .and. (grid2_ir(2,idx) .eq. grid2max) .and. &
                        (grid2_ir(1,idx2) .eq. grid2min)) then
-                block_neighbours_ir(3,idx) = idx2
+                block_neighbours_ir(3,idx,1) = idx2
+                block_neighbours_ir(3,idx,2) = 1
                 neighbour3unset = .false.
               end if
               if ((grid2_ir(1,idx) .eq. grid2_ir(2,idx2)) .and. coord1aligned .and. &
                    coord3aligned) then
-                block_neighbours_ir(4,idx) = idx2
+                block_neighbours_ir(4,idx,1) = idx2
                 neighbour4unset = .false.
               else if ((periodic2) .and. (grid2_ir(1,idx) .eq. grid2min) .and. &
                        (grid2_ir(2,idx2) .eq. grid2max)) then
-                block_neighbours_ir(4,idx) = idx2
+                block_neighbours_ir(4,idx,1) = idx2
+                block_neighbours_ir(4,idx,2) = -1
                 neighbour4unset = .false.
               end if
               if ((grid3_ir(2,idx) .eq. grid3_ir(1,idx2)) .and. coord1aligned .and. &
                    coord2aligned) then
-                block_neighbours_ir(5,idx) = idx2
+                block_neighbours_ir(5,idx,1) = idx2
                 neighbour5unset = .false.
               else if ((periodic3) .and. (grid3_ir(2,idx) .eq. grid3max) .and. &
                        (grid3_ir(1,idx2) .eq. grid3min)) then
-                block_neighbours_ir(5,idx) = idx2
+                block_neighbours_ir(5,idx,1) = idx2
+                block_neighbours_ir(5,idx,2) = 1
                 neighbour5unset = .false.
               end if
               if ((grid3_ir(1,idx) .eq. grid3_ir(2,idx2)) .and. coord1aligned .and. &
                    coord2aligned) then
-                block_neighbours_ir(6,idx) = idx2
+                block_neighbours_ir(6,idx,1) = idx2
                 neighbour6unset = .false.
               else if ((periodic3) .and. (grid3_ir(1,idx) .eq. grid3min) .and. &
                        (grid3_ir(2,idx2) .eq. grid3max)) then
-                block_neighbours_ir(6,idx) = idx2
+                block_neighbours_ir(6,idx,1) = idx2
+                block_neighbours_ir(6,idx,2) = -1
                 neighbour6unset = .false.
               end if
             end if
@@ -851,19 +877,22 @@ module USlip_Functions_Fortran
 
       subroutine irregular_grid_adjacent_points(pt_indices, adj)
       !Each point on the grid is denoted by 4 indices:
-      !(1) idx_block, (2) idx_grid1, (3) idx_grid2, (4) idx_grid3
+      !(1) idx_block, (2) idx_grid1, (3) idx_grid2, (4) idx_grid3, (5) periodicity
       !For a given such point with pt_indices, find the 6 adjacent points
       !adj(:,i) has +/- in grid1, +/- in grid2, +/- in grid3
       !Return the same point if no matching point in another block
 
-        INTEGER :: pt_indices(4), adj(4,6)
+        INTEGER :: pt_indices(4), adj(5,6)
+
+        adj(5,:) = 0
 
         if (pt_indices(2) .eq. 1) then
-          if (block_neighbours_ir(2,pt_indices(1)) .gt. 0) then
-            adj(1,2) = block_neighbours_ir(2,pt_indices(1))
+          if (block_neighbours_ir(2,pt_indices(1),1) .gt. 0) then
+            adj(1,2) = block_neighbours_ir(2,pt_indices(1),1)
             adj(2,2) = sz_1-1
             adj(3,2) = pt_indices(3)
             adj(4,2) = pt_indices(4)
+            adj(5,2) = block_neighbours_ir(2,pt_indices(1),2)
           else
             adj(1,2) = pt_indices(1)
             adj(2,2) = 1
@@ -875,11 +904,12 @@ module USlip_Functions_Fortran
           adj(3,1) = pt_indices(3)
           adj(4,1) = pt_indices(4)
         else if (pt_indices(2) .eq. sz_1) then
-          if (block_neighbours_ir(1,pt_indices(1)) .gt. 0) then
-            adj(1,1) = block_neighbours_ir(1,pt_indices(1))
+          if (block_neighbours_ir(1,pt_indices(1),1) .gt. 0) then
+            adj(1,1) = block_neighbours_ir(1,pt_indices(1),1)
             adj(2,1) = 2
             adj(3,1) = pt_indices(3)
             adj(4,1) = pt_indices(4)
+            adj(5,1) = block_neighbours_ir(1,pt_indices(1),2)
           else
             adj(1,1) = pt_indices(1)
             adj(2,1) = sz_1
@@ -902,11 +932,12 @@ module USlip_Functions_Fortran
         end if
 
         if (pt_indices(3) .eq. 1) then
-          if (block_neighbours_ir(4,pt_indices(1)) .gt. 0) then
-            adj(1,4) = block_neighbours_ir(4,pt_indices(1))
+          if (block_neighbours_ir(4,pt_indices(1),1) .gt. 0) then
+            adj(1,4) = block_neighbours_ir(4,pt_indices(1),1)
             adj(2,4) = pt_indices(2)
             adj(3,4) = sz_2-1
             adj(4,4) = pt_indices(4)
+            adj(5,4) = block_neighbours_ir(4,pt_indices(1),2)
           else
             adj(1,4) = pt_indices(1)
             adj(2,4) = pt_indices(2)
@@ -918,11 +949,12 @@ module USlip_Functions_Fortran
           adj(3,3) = 2
           adj(4,3) = pt_indices(4)
         else if (pt_indices(3) .eq. sz_2) then
-          if (block_neighbours_ir(3,pt_indices(1)) .gt. 0) then
-            adj(1,3) = block_neighbours_ir(3,pt_indices(1))
+          if (block_neighbours_ir(3,pt_indices(1),1) .gt. 0) then
+            adj(1,3) = block_neighbours_ir(3,pt_indices(1),1)
             adj(2,3) = pt_indices(2)
             adj(3,3) = 2
             adj(4,3) = pt_indices(4)
+            adj(5,3) = block_neighbours_ir(3,pt_indices(1),2)
           else
             adj(1,3) = pt_indices(1)
             adj(2,3) = pt_indices(2)
@@ -945,11 +977,12 @@ module USlip_Functions_Fortran
         end if
 
         if (pt_indices(4) .eq. 1) then
-          if (block_neighbours_ir(6,pt_indices(1)) .gt. 0) then
-            adj(1,6) = block_neighbours_ir(6,pt_indices(1))
+          if (block_neighbours_ir(6,pt_indices(1),1) .gt. 0) then
+            adj(1,6) = block_neighbours_ir(6,pt_indices(1),1)
             adj(2,6) = pt_indices(2)
             adj(3,6) = pt_indices(3)
             adj(4,6) = sz_3-1
+            adj(5,6) = block_neighbours_ir(6,pt_indices(1),2)
           else
             adj(1,6) = pt_indices(1)
             adj(2,6) = pt_indices(2)
@@ -961,11 +994,12 @@ module USlip_Functions_Fortran
           adj(3,5) = pt_indices(3)
           adj(4,5) = 2
         else if (pt_indices(4) .eq. sz_3) then
-          if (block_neighbours_ir(5,pt_indices(1)) .gt. 0) then
-            adj(1,5) = block_neighbours_ir(5,pt_indices(1))
+          if (block_neighbours_ir(5,pt_indices(1),1) .gt. 0) then
+            adj(1,5) = block_neighbours_ir(5,pt_indices(1),1)
             adj(2,5) = pt_indices(2)
             adj(3,5) = pt_indices(3)
             adj(4,5) = 2
+            adj(5,5) = block_neighbours_ir(5,pt_indices(1),2)
           else
             adj(1,5) = pt_indices(1)
             adj(2,5) = pt_indices(2)
@@ -1007,6 +1041,31 @@ module USlip_Functions_Fortran
                         -grid3_ir(1,pt_indices(1))) + grid3_ir(1,pt_indices(1))
 
       end subroutine irregular_grid_point_coordinates
+
+
+      subroutine resolve_irregular_periodicities(adj, grid1_up, grid1_down, grid2_up, &
+                                                 grid2_down, grid3_up, grid3_down)
+
+        INTEGER :: adj(5,6)
+        REAL(num) :: grid1_up, grid1_down, grid2_up, grid2_down, grid3_up, grid3_down
+
+        REAL(num) :: c_up(3), c_down(3), c_right(3), c_left(3), c_fwd(3), c_back(3)
+
+        call irregular_grid_point_coordinates(adj(1:4,1),c_up)
+        call irregular_grid_point_coordinates(adj(1:4,2),c_down)
+        call irregular_grid_point_coordinates(adj(1:4,3),c_right)
+        call irregular_grid_point_coordinates(adj(1:4,4),c_left)
+        call irregular_grid_point_coordinates(adj(1:4,5),c_fwd)
+        call irregular_grid_point_coordinates(adj(1:4,6),c_back)
+
+        grid1_up = c_up(1) + REAL(adj(5,1),num)*(grid1max-grid1min)
+        grid1_down = c_down(1) + REAL(adj(5,2),num)*(grid1max-grid1min)
+        grid2_up = c_right(2) + REAL(adj(5,3),num)*(grid2max-grid2min)
+        grid2_down = c_left(2) + REAL(adj(5,4),num)*(grid2max-grid2min)
+        grid3_up = c_fwd(3) + REAL(adj(5,5),num)*(grid3max-grid3min)
+        grid3_down = c_back(3) + REAL(adj(5,6),num)*(grid3max-grid3min)
+
+      end subroutine resolve_irregular_periodicities
 
 
       subroutine process_Bfield_slip
