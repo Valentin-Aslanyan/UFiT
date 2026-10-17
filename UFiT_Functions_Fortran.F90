@@ -1180,13 +1180,12 @@ module UFiT_Functions_Fortran
         INTEGER(1) :: restart_flag, subdomain_file
         INTEGER(4) :: L3D_unit, endianness, sdf_version, sdf_revision,summary_size, nblocks
         INTEGER(4) :: block_header_length, step, jobid1, jobid2, string_length, code_io_version
-        INTEGER(4) :: blocktype, datatype, ndims, block_info_length, geometry_type
+        INTEGER(4) :: blocktype, datatype, ndims, block_info_length
         INTEGER(8) :: first_block_location, next_block_location, current_block_location
         INTEGER(8) :: summary_location, data_location, data_length
         CHARACTER(len=4) :: sdf1_str
         CHARACTER(len=32) :: code_name
         CHARACTER(len=32) :: block_id
-        CHARACTER(len=32) :: data_description
         REAL(8) :: time
         REAL(8), DIMENSION(:), ALLOCATABLE :: mults
         INTEGER(4), DIMENSION(:), ALLOCATABLE :: dims
@@ -1949,7 +1948,7 @@ module UFiT_Functions_Fortran
 
         call fseek(AMRVAC_unit,data_offset,0)
 
-	dx0 = (xprobmax - xprobmin)/domain_nx
+        dx0 = (xprobmax - xprobmin)/domain_nx
 
         DO idx_blk = 1,num_blocks
           dx = dx0 / 2**(refinement_level(idx_blk) - 1)

@@ -33,11 +33,6 @@ module USlip_Functions_Fortran
       REAL(num), DIMENSION(:,:,:,:,:), ALLOCATABLE :: sigmaalpha_grid_ir
 
       abstract interface
-        subroutine adjacent_points_iface (pt_indices, adj)
-          IMPORT
-          INTEGER :: pt_indices(4), adj(4,6)
-        end subroutine adjacent_points_iface
-
         subroutine regular_curl_iface (pt_indices, grid_data, curl_out)
           IMPORT
           INTEGER :: pt_indices(3)
@@ -1512,15 +1507,15 @@ module USlip_Functions_Fortran
         block_name = 'Magnetic_Field/Sigmaz'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
                                     units, sz_1, sz_2, sz_3, sigma_grid(3,:,:,:))
-        block_id = 'SigmaAlphax                       '
+        block_id = 'SigmaAlphax                     '
         block_name = 'Magnetic_Field/SigmaAlphax'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
                                     units, sz_1, sz_2, sz_3, sigmaalpha_grid(1,:,:,:))
-        block_id = 'SigmaAlphay                       '
+        block_id = 'SigmaAlphay                     '
         block_name = 'Magnetic_Field/SigmaAlphay'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
                                     units, sz_1, sz_2, sz_3, sigmaalpha_grid(2,:,:,:))
-        block_id = 'SigmaAlphaz                       '
+        block_id = 'SigmaAlphaz                     '
         block_name = 'Magnetic_Field/SigmaAlphaz'
         call write_Lare3d_datablock(L3D_out, string_length, block_id, block_name, &
                                     units, sz_1, sz_2, sz_3, sigmaalpha_grid(3,:,:,:))
