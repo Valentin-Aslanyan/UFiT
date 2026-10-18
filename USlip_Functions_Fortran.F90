@@ -2012,7 +2012,8 @@ module USlip_Functions_Fortran
 #ifndef MPI_OFFSET_KIND
 #define MPI_OFFSET_KIND 8
 #endif
-        INTEGER :: bfieldin_unit, bfieldout_unit, chunksize, bytestoread
+        LOGICAL :: stop_found
+        INTEGER :: stp_idx, bfieldin_unit, bfieldout_unit, chunksize, bytestoread
         INTEGER :: version_no, tree_offset, data_offset, nw, ndir, MAndim
         INTEGER :: levmax, nleafs, nparents, MAit, n_params
         INTEGER :: snapshotnext, slicenext, collapsenext
@@ -2027,6 +2028,18 @@ module USlip_Functions_Fortran
         INTEGER :: idx_blk, idx1, idx2, idx3, blksz1, blksz2, blksz3
         CHARACTER, DIMENSION(:), ALLOCATABLE :: tempdata
         REAL(8), DIMENSION(:,:,:,:), ALLOCATABLE :: data_temp1, data_temp2
+
+        stop_found = .false.
+        stp_idx = str_mx
+        DO WHILE ((stp_idx .gt. 0) .and. (.not. stop_found))
+          if ((B_filename(stp_idx:stp_idx) .eq. '\') .or. &
+              (B_filename(stp_idx:stp_idx) .eq. '/')) then
+            stop_found = .true.
+          else
+            stp_idx = stp_idx - 1
+          end if
+        END DO
+        out_filename=trim(out_directory) // B_filename(stp_idx+1:)
 
         open(newunit=bfieldin_unit,file=B_filename,access='stream')
         open(newunit=bfieldout_unit,file=out_filename,access='stream')
