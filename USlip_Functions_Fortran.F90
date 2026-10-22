@@ -480,7 +480,7 @@ module USlip_Functions_Fortran
 
         if (pt_indices(1) .eq. 1) then
           if (periodic1) then
-            adj(1,2) = sz_1
+            adj(1,2) = sz_1-1
             adj(2,2) = -1
           else
             adj(1,2) = 1
@@ -488,7 +488,7 @@ module USlip_Functions_Fortran
           adj(1,1) = pt_indices(1)+1
         else if (pt_indices(1) .eq. sz_1) then
           if (periodic1) then
-            adj(1,1) = 1
+            adj(1,1) = 2
             adj(2,1) = 1
           else
             adj(1,1) = sz_1
@@ -500,7 +500,7 @@ module USlip_Functions_Fortran
         end if
         if (pt_indices(2) .eq. 1) then
           if (periodic2) then
-            adj(1,4) = sz_2
+            adj(1,4) = sz_2-1
             adj(2,4) = -1
           else
             adj(1,4) = 1
@@ -508,7 +508,7 @@ module USlip_Functions_Fortran
           adj(1,3) = pt_indices(2)+1
         else if (pt_indices(2) .eq. sz_2) then
           if (periodic2) then
-            adj(1,3) = 1
+            adj(1,3) = 2
             adj(2,3) = 1
           else
             adj(1,3) = sz_2
@@ -520,7 +520,7 @@ module USlip_Functions_Fortran
         end if
         if (pt_indices(3) .eq. 1) then
           if (periodic3) then
-            adj(1,6) = sz_3
+            adj(1,6) = sz_3-1
             adj(2,6) = -1
           else
             adj(1,6) = 1
@@ -528,7 +528,7 @@ module USlip_Functions_Fortran
           adj(1,5) = pt_indices(3)+1
         else if (pt_indices(3) .eq. sz_3) then
           if (periodic3) then
-            adj(1,5) = 1
+            adj(1,5) = 2
             adj(2,5) = 1
           else
             adj(1,5) = sz_3
